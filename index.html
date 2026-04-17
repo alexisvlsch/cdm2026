@@ -65,9 +65,9 @@
       </div>
     </div>
 
-    <div class="data-note" style="max-width:420px;margin-top:16px;">
+    <div class="data-note" style="max-width:420px;margin-top:16px;" id="storage-note">
       <i class="fas fa-info-circle"></i>
-      Les données sont sauvegardées localement dans ton navigateur.
+      <span id="storage-note-text">Données sauvegardées localement dans ton navigateur.</span>
     </div>
   </div>
 
@@ -75,6 +75,12 @@
   <div class="confetti-container" id="confetti-container" aria-hidden="true"></div>
 
   <div id="toast-container"></div>
+
+  <!-- Firebase SDK (loaded unconditionally; initFirebase() handles the case where config is absent) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <!-- Optional: firebase-config.js sets window.__FIREBASE_CONFIG__ (gitignored, see firebase-config.example.js) -->
+  <script src="firebase-config.js" onerror="/* Firebase not configured — using localStorage */"></script>
 
   <script src="app.js"></script>
   <script>
@@ -86,6 +92,14 @@
     async function initIndexPage() {
       // Load data into localStorage on first visit
       await loadAllData();
+
+      // Update storage note based on Firebase status
+      const noteEl = document.getElementById('storage-note-text');
+      if (noteEl) {
+        noteEl.textContent = isFirebaseActive()
+          ? 'Base de données partagée active — tes données sont visibles par tous. 🌐'
+          : 'Données sauvegardées localement dans ton navigateur.';
+      }
 
       // If already logged in, redirect to bets
       const user = getCurrentUser();
