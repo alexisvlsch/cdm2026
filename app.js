@@ -253,7 +253,7 @@ async function loadAllData() {
 
       // Apply Firestore match results so admin-set results are visible everywhere.
       const firestoreResults = new Map(
-        matchResultsSnap.docs.map(d => { const { id, result } = d.data(); return [id, result]; })
+        matchResultsSnap.docs.map(d => [d.data().id, d.data().result])
       );
       for (const m of matches) {
         if (firestoreResults.has(m.id)) {
