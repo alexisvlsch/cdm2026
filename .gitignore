@@ -1,6 +1,3 @@
-# Firebase config (contains secrets - never commit this)
-firebase-config.js
-
 # OS files
 .DS_Store
 Thumbs.db
