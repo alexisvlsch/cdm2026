@@ -21,7 +21,9 @@ let db = null;
  */
 function initFirebase() {
   if (typeof window === 'undefined' || !window.__FIREBASE_CONFIG__) return false;
-  if (typeof firebase === 'undefined') return false;
+  // firebase-app-compat.js and firebase-firestore-compat.js must be loaded before app.js
+  // (they are listed as blocking <script> tags in HTML, so no race condition)
+  if (typeof firebase === 'undefined' || typeof firebase.firestore !== 'function') return false;
   try {
     if (!firebase.apps.length) {
       firebase.initializeApp(window.__FIREBASE_CONFIG__);
