@@ -6,6 +6,82 @@
 // === DEBUG MODE ===
 const DEBUG = localStorage.getItem('debug') === 'true';
 
+// === FIREBASE INTEGRATION ===
+
+/**
+ * Firestore database instance (null when Firebase is not configured).
+ * @type {firebase.firestore.Firestore|null}
+ */
+let db = null;
+
+/**
+ * Initialize Firebase if window.__FIREBASE_CONFIG__ is available.
+ * Sets the `db` variable for use by other functions.
+ * @returns {boolean} True if Firebase was successfully initialized
+ */
+function initFirebase() {
+  if (typeof window === 'undefined' || !window.__FIREBASE_CONFIG__) return false;
+  if (typeof firebase === 'undefined') return false;
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(window.__FIREBASE_CONFIG__);
+    }
+    db = firebase.firestore();
+    debugLog('Firebase initialized — shared database active');
+    return true;
+  } catch (e) {
+    console.warn('[WC2026] Firebase init failed, falling back to localStorage:', e);
+    db = null;
+    return false;
+  }
+}
+
+/**
+ * Save a user document to Firestore (fire-and-forget).
+ * @param {Object} user - User object to persist
+ */
+function fbSaveUser(user) {
+  if (!db) return;
+  db.collection('users').doc(user.id).set(user)
+    .catch(e => debugLog('Firestore: save user failed', e));
+}
+
+/**
+ * Save a bet document to Firestore (fire-and-forget).
+ * @param {Object} bet - Bet object to persist
+ */
+function fbSaveBet(bet) {
+  if (!db) return;
+  db.collection('bets').doc(bet.id).set(bet)
+    .catch(e => debugLog('Firestore: save bet failed', e));
+}
+
+/**
+ * Batch-update multiple bet documents in Firestore (fire-and-forget).
+ * @param {Array} bets - Array of bet objects to update
+ */
+function fbSaveBets(bets) {
+  if (!db || bets.length === 0) return;
+  const batch = db.batch();
+  for (const bet of bets) {
+    batch.set(db.collection('bets').doc(bet.id), bet);
+  }
+  batch.commit().catch(e => debugLog('Firestore: batch save bets failed', e));
+}
+
+/**
+ * Batch-update multiple user documents in Firestore (fire-and-forget).
+ * @param {Array} users - Array of user objects to update
+ */
+function fbSaveUsers(users) {
+  if (!db || users.length === 0) return;
+  const batch = db.batch();
+  for (const user of users) {
+    batch.set(db.collection('users').doc(user.id), user);
+  }
+  batch.commit().catch(e => debugLog('Firestore: batch save users failed', e));
+}
+
 /**
  * Log a message only in debug mode.
  * @param {...*} args - Arguments to log
@@ -97,18 +173,83 @@ async function fetchAndMerge(url, localKey, idField = 'id') {
 }
 
 /**
- * Load all application data (users, matches, bets) from server + localStorage.
+ * Load all application data (users, matches, bets).
+ * - Matches: always loaded from data/fixtures.json. Remote metadata always wins
+ *   (to pick up fixture corrections), but locally-set `result` values are preserved.
+ * - Users & Bets: loaded from Firestore when Firebase is configured,
+ *   otherwise from data/users.json + data/bets.json merged with localStorage.
  * @returns {Promise<{users: Array, matches: Array, bets: Array}>}
  */
 async function loadAllData() {
   const base = getBasePath();
-  const [users, matches, bets] = await Promise.all([
-    fetchAndMerge(`${base}data/users.json`, KEYS.USERS),
-    fetchAndMerge(`${base}data/matches.json`, KEYS.MATCHES),
-    fetchAndMerge(`${base}data/bets.json`, KEYS.BETS),
-  ]);
+
+  // Matches: remote fixture metadata wins, but preserve locally-stored results
+  const matches = await fetchAndMergeFixtures(`${base}data/fixtures.json`);
+
+  let users, bets;
+
+  if (db) {
+    // Load users and bets from Firestore for shared persistence
+    try {
+      const [usersSnap, betsSnap] = await Promise.all([
+        db.collection('users').get(),
+        db.collection('bets').get(),
+      ]);
+      users = usersSnap.docs.map(d => d.data());
+      bets = betsSnap.docs.map(d => d.data());
+      // Cache locally for offline resilience
+      storageSet(KEYS.USERS, users);
+      storageSet(KEYS.BETS, bets);
+      debugLog('Firestore data loaded', { users: users.length, bets: bets.length });
+    } catch (e) {
+      console.warn('[WC2026] Firestore load failed, falling back to localStorage:', e);
+      users = storageGet(KEYS.USERS, []);
+      bets = storageGet(KEYS.BETS, []);
+    }
+  } else {
+    // Fallback: local JSON files merged with localStorage
+    [users, bets] = await Promise.all([
+      fetchAndMerge(`${base}data/users.json`, KEYS.USERS),
+      fetchAndMerge(`${base}data/bets.json`, KEYS.BETS),
+    ]);
+  }
+
   debugLog('Data loaded', { users: users.length, matches: matches.length, bets: bets.length });
   return { users, matches, bets };
+}
+
+/**
+ * Fetch fixtures from the server. Remote metadata (teams, dates, venue, stage)
+ * always takes precedence over localStorage to reflect any official schedule
+ * corrections. Only the `result` field from localStorage is preserved (admin updates).
+ * @param {string} url - URL of the fixtures JSON file
+ * @returns {Promise<Array>} Array of match objects
+ */
+async function fetchAndMergeFixtures(url) {
+  const localData = storageGet(KEYS.MATCHES, null);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const remoteData = await response.json();
+    if (!Array.isArray(remoteData)) throw new Error('Not an array');
+
+    // Build a result map from localStorage (preserves admin-set results)
+    const resultMap = localData
+      ? new Map(localData.map(m => [m.id, m.result]))
+      : new Map();
+
+    // Remote metadata wins; only re-apply preserved results
+    const merged = remoteData.map(m => ({
+      ...m,
+      result: resultMap.has(m.id) ? resultMap.get(m.id) : m.result,
+    }));
+
+    storageSet(KEYS.MATCHES, merged);
+    return merged;
+  } catch (e) {
+    debugLog('fetchAndMergeFixtures error', e);
+    return localData || [];
+  }
 }
 
 /**
@@ -195,6 +336,8 @@ function createUser(username) {
   const users = getUsers();
   users.push(user);
   saveUsers(users);
+  // Persist to Firestore if available
+  fbSaveUser(user);
   return { success: true, user };
 }
 
@@ -256,6 +399,8 @@ function placeBet(userId, matchId, prediction) {
     bets.push(bet);
   }
   saveBets(bets);
+  // Persist to Firestore if available
+  fbSaveBet(bet);
   return { success: true };
 }
 
@@ -328,6 +473,8 @@ function recalculateMatch(matchId) {
     }
   }
   saveBets(bets);
+  // Sync affected bets to Firestore
+  fbSaveBets(bets.filter(b => b.matchId === matchId));
 
   // Recalculate all user points from scratch
   recalculateAllPoints();
@@ -353,6 +500,8 @@ function recalculateAllPoints() {
     user.points = pointsMap.get(user.id) || 0;
   }
   saveUsers(users);
+  // Sync updated user points to Firestore
+  fbSaveUsers(users);
 }
 
 /**
@@ -583,4 +732,17 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// === FIREBASE AUTO-INIT ===
+// Attempt to initialize Firebase immediately when app.js is loaded.
+// firebase-config.js (if present) must be loaded before app.js.
+initFirebase();
+
+/**
+ * Return whether shared Firestore database is active.
+ * @returns {boolean}
+ */
+function isFirebaseActive() {
+  return db !== null;
 }
