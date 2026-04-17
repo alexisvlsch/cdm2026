@@ -305,16 +305,8 @@
           return;
         }
 
-        // Update match result
-        const matches = getMatches();
-        const match = matches.find(m => m.id === matchId);
-        if (!match) return;
-
-        match.result = result;
-        saveMatches(matches);
-
-        // Recalculate bets and points
-        const correctCount = recalculateMatch(matchId);
+        // Update match result and persist to Firestore
+        const correctCount = setMatchResult(matchId, result);
 
         // Update the option in the dropdown to reflect the result
         const option = matchSelect.querySelector(`option[value="${matchId}"]`);

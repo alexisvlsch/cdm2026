@@ -25,6 +25,10 @@
  *          allow read: if true;
  *          allow write: if true;
  *        }
+ *        match /matches/{matchId} {
+ *          allow read: if true;
+ *          allow write: if true;
+ *        }
  *      }
  *    }
  *

@@ -75,6 +75,17 @@ function fbSaveBet(bet) {
 }
 
 /**
+ * Save a match result to Firestore (fire-and-forget).
+ * Only the id and result fields are stored to avoid overwriting fixture metadata.
+ * @param {Object} match - Match object with result set
+ */
+function fbSaveMatchResult(match) {
+  if (!db) return;
+  db.collection('matches').doc(match.id).set({ id: match.id, result: match.result })
+    .catch(e => debugLog('Firestore: save match result failed', e));
+}
+
+/**
  * Batch-update multiple bet documents in Firestore (fire-and-forget).
  * @param {Array} bets - Array of bet objects to update
  */
@@ -194,8 +205,14 @@ async function fetchAndMerge(url, localKey, idField = 'id') {
  * Load all application data (users, matches, bets).
  * - Matches: always loaded from data/fixtures.json. Remote metadata always wins
  *   (to pick up fixture corrections), but locally-set `result` values are preserved.
- * - Users & Bets: loaded from Firestore when Firebase is configured,
- *   otherwise from data/users.json + data/bets.json merged with localStorage.
+ *   When Firebase is configured, match results from Firestore also take precedence
+ *   so that admin-set results are shared across all devices.
+ * - Users & Bets: loaded from Firestore when Firebase is configured.
+ *   Firestore wins for items that exist in Firestore; items present only in
+ *   localStorage (e.g. pending fire-and-forget writes) are preserved to avoid
+ *   data loss due to timing races.
+ * - Falls back to data/users.json + data/bets.json merged with localStorage when
+ *   Firebase is not configured.
  * @returns {Promise<{users: Array, matches: Array, bets: Array}>}
  */
 async function loadAllData() {
@@ -207,17 +224,47 @@ async function loadAllData() {
   let users, bets;
 
   if (db) {
-    // Load users and bets from Firestore for shared persistence
+    // Load users, bets, and match results from Firestore for shared persistence
     try {
-      const [usersSnap, betsSnap] = await Promise.all([
+      const [usersSnap, betsSnap, matchResultsSnap] = await Promise.all([
         db.collection('users').get(),
         db.collection('bets').get(),
+        db.collection('matches').get(),
       ]);
-      users = usersSnap.docs.map(d => d.data());
-      bets = betsSnap.docs.map(d => d.data());
+
+      // Merge users: Firestore wins for existing items; preserve local-only items
+      // (e.g. a user created just before this load whose write hasn't landed yet).
+      const remoteUsers = usersSnap.docs.map(d => d.data());
+      const localUsers = storageGet(KEYS.USERS, []);
+      const userMap = new Map(remoteUsers.map(u => [u.id, u]));
+      for (const lu of localUsers) {
+        if (!userMap.has(lu.id)) userMap.set(lu.id, lu);
+      }
+      users = Array.from(userMap.values());
+
+      // Merge bets: same strategy as users.
+      const remoteBets = betsSnap.docs.map(d => d.data());
+      const localBets = storageGet(KEYS.BETS, []);
+      const betMap = new Map(remoteBets.map(b => [b.id, b]));
+      for (const lb of localBets) {
+        if (!betMap.has(lb.id)) betMap.set(lb.id, lb);
+      }
+      bets = Array.from(betMap.values());
+
+      // Apply Firestore match results so admin-set results are visible everywhere.
+      const firestoreResults = new Map(
+        matchResultsSnap.docs.map(d => { const { id, result } = d.data(); return [id, result]; })
+      );
+      for (const m of matches) {
+        if (firestoreResults.has(m.id)) {
+          m.result = firestoreResults.get(m.id);
+        }
+      }
+
       // Cache locally for offline resilience
       storageSet(KEYS.USERS, users);
       storageSet(KEYS.BETS, bets);
+      storageSet(KEYS.MATCHES, matches);
       debugLog('Firestore data loaded', { users: users.length, bets: bets.length });
     } catch (e) {
       console.warn('[WC2026] Firestore load failed, falling back to localStorage:', e);
@@ -467,6 +514,24 @@ function formatDate(isoDate) {
     minute: '2-digit',
     timeZone: 'Europe/Paris',
   });
+}
+
+/**
+ * Set a match result, persist it to localStorage and Firestore, and recalculate scores.
+ * Use this instead of manually calling saveMatches + recalculateMatch so that the
+ * result is shared across all devices via Firestore.
+ * @param {string} matchId - Match ID
+ * @param {string} result - 'teamA', 'draw', or 'teamB'
+ * @returns {number} Count of correct bets
+ */
+function setMatchResult(matchId, result) {
+  const matches = getMatches();
+  const match = matches.find(m => m.id === matchId);
+  if (!match) return 0;
+  match.result = result;
+  saveMatches(matches);
+  fbSaveMatchResult(match);
+  return recalculateMatch(matchId);
 }
 
 // === POINTS & SCORING ===
