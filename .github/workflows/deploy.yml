@@ -1,0 +1,85 @@
+# .github/workflows/deploy.yml
+#
+# Déploie l'app statique sur GitHub Pages en injectant la config Firebase
+# depuis des Secrets GitHub (aucune clé dans le dépôt).
+#
+# ── Secrets requis (Settings → Secrets and variables → Actions) ───────────
+#   FIREBASE_API_KEY
+#   FIREBASE_AUTH_DOMAIN
+#   FIREBASE_PROJECT_ID
+#   FIREBASE_STORAGE_BUCKET
+#   FIREBASE_MESSAGING_SENDER_ID
+#   FIREBASE_APP_ID
+#
+# ── Activer GitHub Pages ──────────────────────────────────────────────────
+#   Settings → Pages → Source : "GitHub Actions"
+# ─────────────────────────────────────────────────────────────────────────
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate firebase-config.js
+        # Si les secrets ne sont pas définis, le fichier est créé avec des valeurs
+        # vides et initFirebase() basculera automatiquement en mode localStorage.
+        # Python est utilisé pour garantir un échappement correct des valeurs
+        # (guillemets, caractères spéciaux) sans risque d'injection shell.
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        run: |
+          python3 - << 'PYEOF'
+          import json, os
+          cfg = {
+            "apiKey":             os.environ.get("FIREBASE_API_KEY", ""),
+            "authDomain":         os.environ.get("FIREBASE_AUTH_DOMAIN", ""),
+            "projectId":          os.environ.get("FIREBASE_PROJECT_ID", ""),
+            "storageBucket":      os.environ.get("FIREBASE_STORAGE_BUCKET", ""),
+            "messagingSenderId":  os.environ.get("FIREBASE_MESSAGING_SENDER_ID", ""),
+            "appId":              os.environ.get("FIREBASE_APP_ID", ""),
+          }
+          with open("firebase-config.js", "w") as f:
+              f.write("window.__FIREBASE_CONFIG__ = ")
+              f.write(json.dumps(cfg, indent=2))
+              f.write(";\n")
+          PYEOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
