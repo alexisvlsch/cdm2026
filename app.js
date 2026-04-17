@@ -15,12 +15,28 @@ const DEBUG = localStorage.getItem('debug') === 'true';
 let db = null;
 
 /**
- * Initialize Firebase if window.__FIREBASE_CONFIG__ is available.
+ * Return true if cfg contains all required Firebase fields with non-empty values.
+ * @param {*} cfg
+ * @returns {boolean}
+ */
+function isValidFirebaseConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return false;
+  const required = ['apiKey', 'authDomain', 'projectId', 'appId'];
+  return required.every(k => typeof cfg[k] === 'string' && cfg[k].trim() !== '');
+}
+
+/**
+ * Initialize Firebase if window.__FIREBASE_CONFIG__ is available and valid.
  * Sets the `db` variable for use by other functions.
+ * Falls back to localStorage (db = null) if config is absent or incomplete.
  * @returns {boolean} True if Firebase was successfully initialized
  */
 function initFirebase() {
-  if (typeof window === 'undefined' || !window.__FIREBASE_CONFIG__) return false;
+  if (typeof window === 'undefined') return false;
+  if (!isValidFirebaseConfig(window.__FIREBASE_CONFIG__)) {
+    console.info('[WC2026] Firebase config absent or incomplete — using localStorage');
+    return false;
+  }
   // firebase-app-compat.js and firebase-firestore-compat.js must be loaded before app.js
   // (they are listed as blocking <script> tags in HTML, so no race condition)
   if (typeof firebase === 'undefined' || typeof firebase.firestore !== 'function') return false;

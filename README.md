@@ -10,14 +10,65 @@ Avec support optionnel de **Firebase Firestore** pour une base de données parta
 
 ## 🚀 Déploiement sur GitHub Pages
 
+### Sans Firebase (mode localStorage)
+
 1. **Fork** ou clone ce dépôt sur ton compte GitHub.
 2. Va dans **Settings → Pages**.
-3. Sous **Source**, sélectionne la branche `main` (ou `master`) et le dossier `/ (root)`.
-4. Clique **Save** — GitHub Pages génère l'URL en quelques secondes.
+3. Sous **Source**, sélectionne **GitHub Actions**.
+4. Pousse un commit sur `main` — le workflow `.github/workflows/deploy.yml` déploie automatiquement.
 5. Partage l'URL avec tes amis !
 
 > Sans Firebase configuré, chaque navigateur stocke ses propres données (localStorage).
 > Avec Firebase, tous les utilisateurs partagent la même base de données.
+
+### Avec Firebase (base partagée) — GitHub Actions + Secrets (recommandé)
+
+> **Aucune clé ne doit être commitée dans le dépôt.**
+> Le workflow génère `firebase-config.js` à chaque déploiement depuis des Secrets GitHub.
+
+1. Va dans **Settings → Secrets and variables → Actions** et crée les secrets suivants :
+
+   | Nom du secret                   | Valeur                              |
+   | ------------------------------- | ----------------------------------- |
+   | `FIREBASE_API_KEY`              | `AIzaSy…`                           |
+   | `FIREBASE_AUTH_DOMAIN`          | `mon-projet.firebaseapp.com`        |
+   | `FIREBASE_PROJECT_ID`           | `mon-projet`                        |
+   | `FIREBASE_STORAGE_BUCKET`       | `mon-projet.appspot.com`            |
+   | `FIREBASE_MESSAGING_SENDER_ID`  | `123456789`                         |
+   | `FIREBASE_APP_ID`               | `1:123456789:web:abc123`            |
+
+2. Va dans **Settings → Pages → Source** et sélectionne **GitHub Actions**.
+
+3. Pousse un commit sur `main` (ou déclenche le workflow manuellement via **Actions → Deploy to GitHub Pages → Run workflow**).
+
+Le fichier `firebase-config.js` est **généré automatiquement** pendant le déploiement — il n'existe jamais dans le dépôt Git et n'est pas versionné.
+
+#### Format exact de firebase-config.js (généré automatiquement)
+
+```js
+window.__FIREBASE_CONFIG__ = {
+  apiKey: "AIzaSy...",
+  authDomain: "mon-projet.firebaseapp.com",
+  projectId: "mon-projet",
+  storageBucket: "mon-projet.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
+};
+```
+
+#### Ordre de chargement des scripts (HTML)
+
+Les scripts doivent être inclus dans cet ordre exact (déjà configuré dans les pages HTML) :
+
+```html
+<!-- 1. SDK Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<!-- 2. Config Firebase (définit window.__FIREBASE_CONFIG__) -->
+<script src="firebase-config.js" onerror="/* pas de Firebase — localStorage utilisé */"></script>
+<!-- 3. Logique de l'app -->
+<script src="app.js"></script>
+```
 
 ---
 
@@ -44,6 +95,9 @@ Avec support optionnel de **Firebase Firestore** pour une base de données parta
 
 > **Sans Firebase** : l'app fonctionne en mode `localStorage` — chaque navigateur a ses propres données.
 > **Avec Firebase** : tous les utilisateurs partagent une base commune et voient les stats/paris de tout le monde.
+>
+> Si `firebase-config.js` est absent ou incomplet au chargement, l'app bascule automatiquement
+> en mode localStorage (un message `[WC2026] Firebase config absent or incomplete` apparaît dans la console).
 
 ### Étape 1 — Créer un projet Firebase
 
@@ -82,6 +136,13 @@ service cloud.firestore {
 
 ### Étape 3 — Configurer l'app
 
+#### Option A — GitHub Actions + Secrets (recommandée pour GitHub Pages)
+
+Suis les instructions de la section **[Déploiement sur GitHub Pages → Avec Firebase](#avec-firebase-base-partagée--github-actions--secrets-recommandé)** ci-dessus.
+Aucun fichier de config à créer manuellement — tout est géré par le workflow.
+
+#### Option B — En local (développement)
+
 1. Copie `firebase-config.example.js` en `firebase-config.js` :
 
 ```bash
@@ -101,27 +162,7 @@ window.__FIREBASE_CONFIG__ = {
 };
 ```
 
-3. **Ne commite jamais `firebase-config.js`** — il est dans `.gitignore`.
-
-### Déploiement sur GitHub Pages avec Firebase
-
-Pour que GitHub Pages charge le fichier de config, **commite `firebase-config.js`** une seule fois
-(les clés Firebase côté client sont publiques par conception — la sécurité repose sur les Règles Firestore).
-
-Ou, utilise GitHub Actions + Secrets pour injecter les clés automatiquement :
-
-```yaml
-# .github/workflows/deploy.yml
-- name: Create firebase config
-  run: |
-    cat > firebase-config.js << EOF
-    window.__FIREBASE_CONFIG__ = {
-      apiKey: "${{ secrets.FIREBASE_API_KEY }}",
-      projectId: "${{ secrets.FIREBASE_PROJECT_ID }}",
-      ...
-    };
-    EOF
-```
+> `firebase-config.js` est dans `.gitignore` — ne le commite pas.
 
 ---
 
