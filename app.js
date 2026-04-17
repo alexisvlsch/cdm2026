@@ -232,41 +232,17 @@ async function loadAllData() {
         db.collection('matches').get(),
       ]);
 
-      // Merge users: Firestore wins for existing items; preserve local-only items
-      // (e.g. a user created just before this load whose write hasn't landed yet).
-      const remoteUsers = usersSnap.docs.map(d => d.data());
-      const localUsers = storageGet(KEYS.USERS, []);
-      const userMap = new Map(remoteUsers.map(u => [u.id, u]));
-      const localOnlyUsers = [];
-      for (const lu of localUsers) {
-        if (!userMap.has(lu.id)) {
-          userMap.set(lu.id, lu);
-          localOnlyUsers.push(lu);
-        }
-      }
-      users = Array.from(userMap.values());
-      // Migrate local-only users (created before Firestore was set up) to Firestore
-      if (localOnlyUsers.length > 0) {
-        debugLog('Migrating local-only users to Firestore', localOnlyUsers.map(u => u.username));
-        fbSaveUsers(localOnlyUsers);
-      }
+      // Firestore is the single source of truth: use remote data as-is.
+      // Deleting a document in Firestore will be reflected in localStorage on next load.
+      users = usersSnap.docs.map(d => d.data());
+      bets = betsSnap.docs.map(d => d.data());
 
-      // Merge bets: same strategy as users.
-      const remoteBets = betsSnap.docs.map(d => d.data());
-      const localBets = storageGet(KEYS.BETS, []);
-      const betMap = new Map(remoteBets.map(b => [b.id, b]));
-      const localOnlyBets = [];
-      for (const lb of localBets) {
-        if (!betMap.has(lb.id)) {
-          betMap.set(lb.id, lb);
-          localOnlyBets.push(lb);
-        }
-      }
-      bets = Array.from(betMap.values());
-      // Migrate local-only bets to Firestore
-      if (localOnlyBets.length > 0) {
-        debugLog('Migrating local-only bets to Firestore', localOnlyBets.length);
-        fbSaveBets(localOnlyBets);
+      // If the currently logged-in user was deleted from Firestore, log them out.
+      const currentUser = storageGet(KEYS.CURRENT_USER, null);
+      const userIds = new Set(users.map(u => u.id));
+      if (currentUser && !userIds.has(currentUser.id)) {
+        debugLog('Current user deleted from Firestore — logging out', currentUser.username);
+        localStorage.removeItem(KEYS.CURRENT_USER);
       }
 
       // Apply Firestore match results so admin-set results are visible everywhere.
