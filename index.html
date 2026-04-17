@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ WC2026 Pronos — Connexion</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body class="pitch-bg">
+  <div class="login-page">
+    <div class="login-header">
+      <h1 class="login-title">⚽ World Cup 2026 — Pronos</h1>
+      <p class="login-subtitle">La plateforme de pronostics entre amis 🎯</p>
+    </div>
+
+    <div class="login-card">
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-login-btn" aria-controls="tab-login" aria-selected="true">
+          🔑 Se connecter
+        </button>
+        <button class="tab-btn" id="tab-register-btn" aria-controls="tab-register" aria-selected="false">
+          🎉 Créer un compte
+        </button>
+      </div>
+
+      <!-- Login tab -->
+      <div class="tab-panel active" id="tab-login" role="tabpanel">
+        <div class="form-group">
+          <label class="form-label" for="login-username">Pseudo</label>
+          <input
+            type="text"
+            id="login-username"
+            class="input"
+            placeholder="Ton pseudo..."
+            autocomplete="username"
+            maxlength="20"
+          />
+          <div class="form-error" id="login-error"></div>
+        </div>
+        <button class="btn btn-primary" id="login-btn" style="width:100%;margin-top:8px;">
+          Entrer dans l'arène 🏟️
+        </button>
+      </div>
+
+      <!-- Register tab -->
+      <div class="tab-panel" id="tab-register" role="tabpanel">
+        <div class="form-group">
+          <label class="form-label" for="register-username">Choisis ton pseudo</label>
+          <input
+            type="text"
+            id="register-username"
+            class="input"
+            placeholder="3–20 caractères, lettres/chiffres/underscore"
+            autocomplete="username"
+            maxlength="20"
+          />
+          <div class="form-error" id="register-error"></div>
+        </div>
+        <button class="btn btn-primary" id="register-btn" style="width:100%;margin-top:8px;">
+          Rejoindre le tournoi 🎉
+        </button>
+      </div>
+    </div>
+
+    <div class="data-note" style="max-width:420px;margin-top:16px;">
+      <i class="fas fa-info-circle"></i>
+      Les données sont sauvegardées localement dans ton navigateur.
+    </div>
+  </div>
+
+  <!-- Confetti container -->
+  <div class="confetti-container" id="confetti-container" aria-hidden="true"></div>
+
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // === INDEX PAGE LOGIC ===
+
+    /**
+     * Initialize the login/register page.
+     */
+    async function initIndexPage() {
+      // Load data into localStorage on first visit
+      await loadAllData();
+
+      // If already logged in, redirect to bets
+      const user = getCurrentUser();
+      if (user) {
+        window.location.href = 'bets.html';
+        return;
+      }
+
+      setupTabs();
+      setupLogin();
+      setupRegister();
+    }
+
+    /**
+     * Set up tab switching behavior.
+     */
+    function setupTabs() {
+      const loginBtn = document.getElementById('tab-login-btn');
+      const registerBtn = document.getElementById('tab-register-btn');
+      const loginPanel = document.getElementById('tab-login');
+      const registerPanel = document.getElementById('tab-register');
+
+      loginBtn.addEventListener('click', () => {
+        loginBtn.classList.add('active');
+        loginBtn.setAttribute('aria-selected', 'true');
+        registerBtn.classList.remove('active');
+        registerBtn.setAttribute('aria-selected', 'false');
+        loginPanel.classList.add('active');
+        registerPanel.classList.remove('active');
+        clearErrors();
+      });
+
+      registerBtn.addEventListener('click', () => {
+        registerBtn.classList.add('active');
+        registerBtn.setAttribute('aria-selected', 'true');
+        loginBtn.classList.remove('active');
+        loginBtn.setAttribute('aria-selected', 'false');
+        registerPanel.classList.add('active');
+        loginPanel.classList.remove('active');
+        clearErrors();
+      });
+    }
+
+    /**
+     * Clear all error messages.
+     */
+    function clearErrors() {
+      document.getElementById('login-error').classList.remove('visible');
+      document.getElementById('register-error').classList.remove('visible');
+    }
+
+    /**
+     * Show an error message in a specific error element.
+     * @param {string} elementId - ID of the error element
+     * @param {string} message - Error message to display
+     */
+    function showError(elementId, message) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.classList.add('visible');
+    }
+
+    /**
+     * Set up login form logic.
+     */
+    function setupLogin() {
+      const loginBtn = document.getElementById('login-btn');
+      const loginInput = document.getElementById('login-username');
+
+      const doLogin = () => {
+        const username = loginInput.value.trim();
+        if (!username) {
+          showError('login-error', 'Entre ton pseudo.');
+          return;
+        }
+        const user = findUserByUsername(username);
+        if (!user) {
+          showError('login-error', 'Nom introuvable. Crée un compte !');
+          return;
+        }
+        setCurrentUser(user);
+        window.location.href = 'bets.html';
+      };
+
+      loginBtn.addEventListener('click', doLogin);
+      loginInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    }
+
+    /**
+     * Set up registration form logic with confetti on success.
+     */
+    function setupRegister() {
+      const registerBtn = document.getElementById('register-btn');
+      const registerInput = document.getElementById('register-username');
+
+      const doRegister = () => {
+        const username = registerInput.value.trim();
+        const result = createUser(username);
+        if (!result.success) {
+          showError('register-error', result.error);
+          return;
+        }
+        setCurrentUser(result.user);
+        launchConfetti();
+        showToast('Compte créé ! Bienvenue dans l\'arène 🎉', 'success');
+        setTimeout(() => { window.location.href = 'bets.html'; }, 1800);
+      };
+
+      registerBtn.addEventListener('click', doRegister);
+      registerInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+    }
+
+    /**
+     * Launch a fun confetti animation.
+     */
+    function launchConfetti() {
+      const container = document.getElementById('confetti-container');
+      const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96E6A1', '#FFA07A'];
+      for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + 'vw';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.width = (Math.random() * 8 + 6) + 'px';
+        piece.style.height = (Math.random() * 8 + 6) + 'px';
+        piece.style.animationDelay = Math.random() * 0.8 + 's';
+        piece.style.animationDuration = (Math.random() * 1.5 + 1.5) + 's';
+        piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        container.appendChild(piece);
+      }
+      setTimeout(() => { container.innerHTML = ''; }, 4000);
+    }
+
+    // Start the page
+    initIndexPage();
+  </script>
+</body>
+</html>

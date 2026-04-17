@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ WC2026 Pronos — Matchs</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+  <!-- Navbar -->
+  <header id="navbar"></header>
+
+  <!-- Main content -->
+  <main class="page-content">
+    <div class="bets-header">
+      <h1 class="bets-title">🏟️ Les Matchs</h1>
+      <div class="data-note">
+        <i class="fas fa-info-circle"></i>
+        Données sauvegardées localement dans ton navigateur.
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div>
+        <div class="filter-label">Filtrer par groupe / phase</div>
+        <div class="filter-buttons" id="stage-filters"></div>
+      </div>
+      <div class="filter-row">
+        <div>
+          <div class="filter-label">Trier</div>
+          <div class="sort-toggle">
+            <button class="sort-btn active" data-sort="date">📅 Par date</button>
+            <button class="sort-btn" data-sort="unbet">🎯 Non pariés</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div class="filter-label">Rechercher une équipe</div>
+          <input
+            type="search"
+            class="search-input"
+            id="search-input"
+            placeholder="🔍 Brésil, France..."
+            aria-label="Rechercher une équipe"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches grid -->
+    <div class="matches-grid" id="matches-grid">
+      <div class="loading">
+        <div class="spinner"></div>
+        <span>Chargement des matchs...</span>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // === BETS PAGE LOGIC ===
+
+    let allMatches = [];
+    let allBets = [];
+    let currentUser = null;
+    let activeStageFilter = 'all';
+    let activeSort = 'date';
+    let searchQuery = '';
+
+    /**
+     * Initialize the bets page.
+     */
+    async function initBetsPage() {
+      currentUser = requireAuth();
+      if (!currentUser) return;
+
+      renderNavbar('bets');
+
+      const data = await loadAllData();
+      allMatches = data.matches;
+      allBets = data.bets;
+
+      buildStageFilters();
+      renderMatches();
+      setupFilters();
+    }
+
+    /**
+     * Build stage filter buttons from available match stages.
+     */
+    function buildStageFilters() {
+      const container = document.getElementById('stage-filters');
+      const stages = new Set();
+      const groups = new Set();
+
+      for (const m of allMatches) {
+        if (m.group) {
+          groups.add(m.group);
+        } else {
+          stages.add(m.stage);
+        }
+      }
+
+      const filters = [
+        { key: 'all', label: 'Tous' },
+        ...Array.from(groups).sort().map(g => ({ key: `group-${g}`, label: `Groupe ${g}` })),
+        ...Array.from(stages).map(s => ({ key: `stage-${s}`, label: s })),
+      ];
+
+      container.innerHTML = filters.map(f => `
+        <button class="filter-btn ${f.key === 'all' ? 'active' : ''}" data-filter="${escapeHtml(f.key)}">
+          ${escapeHtml(f.label)}
+        </button>
+      `).join('');
+
+      container.addEventListener('click', e => {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeStageFilter = btn.dataset.filter;
+        renderMatches();
+      });
+    }
+
+    /**
+     * Set up search and sort event listeners.
+     */
+    function setupFilters() {
+      document.getElementById('search-input').addEventListener('input', e => {
+        searchQuery = e.target.value.trim().toLowerCase();
+        renderMatches();
+      });
+
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeSort = btn.dataset.sort;
+          renderMatches();
+        });
+      });
+    }
+
+    /**
+     * Filter and sort matches based on current filter state.
+     * @returns {Array} Filtered and sorted match array
+     */
+    function getFilteredMatches() {
+      let matches = allMatches.filter(m => {
+        // Stage/group filter
+        if (activeStageFilter !== 'all') {
+          if (activeStageFilter.startsWith('group-')) {
+            const g = activeStageFilter.replace('group-', '');
+            if (m.group !== g) return false;
+          } else {
+            const s = activeStageFilter.replace('stage-', '');
+            if (m.stage !== s) return false;
+          }
+        }
+        // Search filter
+        if (searchQuery) {
+          const text = (m.teamA + ' ' + m.teamB).toLowerCase();
+          if (!text.includes(searchQuery)) return false;
+        }
+        return true;
+      });
+
+      // Sort
+      if (activeSort === 'date') {
+        matches = matches.sort((a, b) => new Date(a.date) - new Date(b.date));
+      } else if (activeSort === 'unbet') {
+        matches = matches.sort((a, b) => {
+          const aBet = getUserBet(currentUser.id, a.id) !== null ? 1 : 0;
+          const bBet = getUserBet(currentUser.id, b.id) !== null ? 1 : 0;
+          if (aBet !== bBet) return aBet - bBet;
+          return new Date(a.date) - new Date(b.date);
+        });
+      }
+
+      return matches;
+    }
+
+    /**
+     * Render the matches grid with cards.
+     */
+    function renderMatches() {
+      const grid = document.getElementById('matches-grid');
+      const matches = getFilteredMatches();
+
+      if (matches.length === 0) {
+        grid.innerHTML = '<div class="no-matches">😕 Aucun match trouvé pour ce filtre.</div>';
+        return;
+      }
+
+      grid.innerHTML = matches.map(match => renderMatchCard(match)).join('');
+
+      // Attach bet button listeners
+      grid.querySelectorAll('.bet-btn').forEach(btn => {
+        if (!btn.disabled) {
+          btn.addEventListener('click', () => handleBetClick(btn));
+        }
+      });
+    }
+
+    /**
+     * Render a single match card HTML string.
+     * @param {Object} match - Match object
+     * @returns {string} HTML string for the card
+     */
+    function renderMatchCard(match) {
+      const locked = isBetLocked(match);
+      const userBet = getUserBet(currentUser.id, match.id);
+      const hasResult = match.result !== null;
+
+      const betSectionHtml = renderBetSection(match, locked, userBet, hasResult);
+
+      return `
+        <article class="match-card" data-match-id="${escapeHtml(match.id)}">
+          <div class="match-card-header">
+            <span class="stage-badge">${escapeHtml(match.stage)}${match.group ? ' ' + escapeHtml(match.group) : ''}</span>
+            <span class="match-date">📅 ${escapeHtml(formatDate(match.date))}</span>
+          </div>
+          <div class="match-body">
+            <div class="match-teams">
+              <div class="team">
+                <span class="team-flag" aria-hidden="true">${match.flagA}</span>
+                <span class="team-name">${escapeHtml(match.teamA)}</span>
+              </div>
+              <div class="vs-label">VS</div>
+              <div class="team team-right">
+                <span class="team-flag" aria-hidden="true">${match.flagB}</span>
+                <span class="team-name">${escapeHtml(match.teamB)}</span>
+              </div>
+            </div>
+            <div class="match-venue">📍 ${escapeHtml(match.venue || '')}</div>
+            ${betSectionHtml}
+          </div>
+        </article>
+      `;
+    }
+
+    /**
+     * Render the bet section for a match card.
+     * @param {Object} match - Match object
+     * @param {boolean} locked - Whether betting is locked
+     * @param {Object|null} userBet - The user's existing bet or null
+     * @param {boolean} hasResult - Whether the match has a result
+     * @returns {string} HTML string for the bet section
+     */
+    function renderBetSection(match, locked, userBet, hasResult) {
+      let statusHtml = '';
+      let buttonsDisabled = '';
+
+      const teamALabel = `🏆 ${escapeHtml(match.teamA)} gagne`;
+      const drawLabel = '🤝 Match nul';
+      const teamBLabel = `🏆 ${escapeHtml(match.teamB)} gagne`;
+
+      const getClass = (prediction) => {
+        let cls = 'bet-btn';
+        if (!locked) {
+          if (userBet && userBet.prediction === prediction) cls += ' selected';
+        } else {
+          if (hasResult) {
+            if (prediction === match.result) cls += ' correct';
+            else if (userBet && userBet.prediction === prediction) cls += ' wrong';
+            else cls += ' faded';
+          } else {
+            if (userBet && userBet.prediction === prediction) cls += ' selected';
+          }
+        }
+        return cls;
+      };
+
+      if (locked) buttonsDisabled = 'disabled';
+
+      if (hasResult && userBet) {
+        const isCorrect = userBet.prediction === match.result;
+        if (isCorrect) {
+          statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
+        } else {
+          statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+        }
+      } else if (hasResult && !userBet) {
+        statusHtml = `<div class="bet-status no-bet">😬 Tu n'as pas parié sur ce match.</div>`;
+      } else if (locked && !userBet) {
+        statusHtml = `<div class="bet-status locked">🔒 Paris fermés. Tu n'as pas parié sur ce match.</div>`;
+      } else if (locked && userBet) {
+        statusHtml = `<div class="bet-status locked">🔒 Pari verrouillé.</div>`;
+      } else if (userBet) {
+        statusHtml = `<div class="bet-status saved">✓ Pari enregistré</div>`;
+      }
+
+      return `
+        <div class="bet-section">
+          <div class="bet-buttons">
+            <button class="${getClass('teamA')}" ${buttonsDisabled}
+              data-match-id="${escapeHtml(match.id)}" data-prediction="teamA">
+              ${teamALabel}
+            </button>
+            <button class="${getClass('draw')}" ${buttonsDisabled}
+              data-match-id="${escapeHtml(match.id)}" data-prediction="draw">
+              ${drawLabel}
+            </button>
+            <button class="${getClass('teamB')}" ${buttonsDisabled}
+              data-match-id="${escapeHtml(match.id)}" data-prediction="teamB">
+              ${teamBLabel}
+            </button>
+          </div>
+          ${statusHtml}
+        </div>
+      `;
+    }
+
+    /**
+     * Get a human-readable label for a match result.
+     * @param {Object} match - Match object with result set
+     * @returns {string} Result label
+     */
+    function getResultLabel(match) {
+      if (match.result === 'teamA') return escapeHtml(match.teamA) + ' gagne';
+      if (match.result === 'teamB') return escapeHtml(match.teamB) + ' gagne';
+      return 'Match nul';
+    }
+
+    /**
+     * Handle a bet button click.
+     * @param {HTMLElement} btn - The clicked bet button
+     */
+    function handleBetClick(btn) {
+      const matchId = btn.dataset.matchId;
+      const prediction = btn.dataset.prediction;
+
+      const result = placeBet(currentUser.id, matchId, prediction);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+
+      // Update allBets reference
+      allBets = getBets();
+
+      showToast('Pari sauvegardé ! 🎯', 'success');
+      renderMatches();
+    }
+
+    initBetsPage();
+  </script>
+</body>
+</html>

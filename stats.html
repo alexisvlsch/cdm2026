@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ WC2026 Pronos — Classement</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body class="stats-page-bg">
+  <!-- Navbar -->
+  <header id="navbar"></header>
+
+  <main class="page-content">
+
+    <!-- Podium section -->
+    <section class="podium-section" id="podium-section" aria-label="Podium top 3">
+      <h2 class="podium-title">🏆 Podium</h2>
+      <div class="podium" id="podium"></div>
+    </section>
+
+    <!-- Personal stats card -->
+    <section class="personal-stats" id="personal-stats" aria-label="Mes statistiques">
+      <h3 class="personal-stats-title">📊 Mes statistiques</h3>
+      <div class="stats-grid" id="stats-grid"></div>
+      <p class="motivational-msg" id="motivational-msg"></p>
+      <div class="profile-actions">
+        <button class="btn btn-outline" id="export-btn">
+          <i class="fas fa-download"></i> Exporter mon profil
+        </button>
+        <label class="btn btn-outline" style="cursor:pointer;">
+          <i class="fas fa-upload"></i> Importer un profil
+          <input type="file" id="import-file" accept=".json" style="display:none;" />
+        </label>
+      </div>
+    </section>
+
+    <!-- Leaderboard table -->
+    <section class="leaderboard-section" aria-label="Classement général">
+      <h3 class="leaderboard-title">🥇 Classement général</h3>
+      <div style="overflow-x:auto;">
+        <table class="leaderboard-table" id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>👤 Joueur</th>
+              <th>✅ Bons pronostics</th>
+              <th>📊 Total paris</th>
+              <th>🎯 Réussite</th>
+              <th>⭐ Points</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Admin panel (hidden, toggle with Shift+A) -->
+    <section class="admin-panel" id="admin-panel" aria-label="Panneau administrateur">
+      <h3 class="admin-title">
+        <i class="fas fa-lock"></i> Panneau Admin
+        <small style="font-size:0.7rem;opacity:0.6;">(Shift+A pour fermer)</small>
+      </h3>
+      <div class="admin-form">
+        <div>
+          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Sélectionne un match</label>
+          <select class="admin-select" id="admin-match-select"></select>
+        </div>
+        <div>
+          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Résultat</label>
+          <select class="admin-select" id="admin-result-select">
+            <option value="">-- Choisir un résultat --</option>
+            <option value="teamA">Équipe A gagne</option>
+            <option value="draw">Match nul</option>
+            <option value="teamB">Équipe B gagne</option>
+          </select>
+        </div>
+        <button class="btn btn-danger" id="admin-submit-btn">
+          <i class="fas fa-check"></i> Valider le résultat
+        </button>
+        <p class="admin-result-msg" id="admin-result-msg"></p>
+        <p style="color:#666;font-size:0.75rem;margin-top:8px;">
+          💡 En production : exporter les données et commiter dans /data/
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // === STATS PAGE LOGIC ===
+
+    let currentUser = null;
+    let leaderboard = [];
+
+    /**
+     * Initialize the stats page.
+     */
+    async function initStatsPage() {
+      currentUser = requireAuth();
+      if (!currentUser) return;
+
+      renderNavbar('stats');
+
+      await loadAllData();
+
+      leaderboard = computeLeaderboard();
+
+      renderPodium();
+      renderPersonalStats();
+      renderLeaderboard();
+      setupAdminPanel();
+      setupProfileActions();
+    }
+
+    /**
+     * Render the top-3 podium section.
+     */
+    function renderPodium() {
+      const podium = document.getElementById('podium');
+      const top3 = leaderboard.slice(0, 3);
+
+      if (top3.length === 0) {
+        podium.innerHTML = '<p style="color:rgba(255,255,255,0.5);text-align:center;">Pas encore de joueurs classés.</p>';
+        return;
+      }
+
+      // Order: 2nd | 1st | 3rd
+      const order = [top3[1], top3[0], top3[2]].filter(Boolean);
+      const numbers = top3[1] ? [2, 1, 3] : [1];
+      const emojis = ['🥈', '👑', '🥉'];
+
+      podium.innerHTML = order.map((entry, i) => {
+        const placeNum = numbers[i];
+        const emoji = emojis[i];
+        const isCurrent = entry.user.id === currentUser.id;
+        return `
+          <div class="podium-place">
+            <div class="podium-avatar">${emoji}</div>
+            <div class="podium-username" style="${isCurrent ? 'color:#FFD700;' : ''}">
+              ${escapeHtml(entry.user.username)}${isCurrent ? ' 👈' : ''}
+            </div>
+            <div class="podium-points">${entry.points} pt${entry.points > 1 ? 's' : ''}</div>
+            <div class="podium-block">${placeNum}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /**
+     * Render the personal statistics card for the logged-in user.
+     */
+    function renderPersonalStats() {
+      const grid = document.getElementById('stats-grid');
+      const msgEl = document.getElementById('motivational-msg');
+      const entry = leaderboard.find(e => e.user.id === currentUser.id);
+
+      if (!entry) {
+        grid.innerHTML = '<p style="color:rgba(255,255,255,0.6);">Aucune statistique disponible pour l\'instant.</p>';
+        return;
+      }
+
+      const rank = leaderboard.indexOf(entry) + 1;
+
+      grid.innerHTML = `
+        <div class="stat-item">
+          <span class="stat-value">${entry.points}</span>
+          <span class="stat-label">⭐ Points</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">${entry.totalBets}</span>
+          <span class="stat-label">🎲 Paris placés</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">${entry.correctBets}</span>
+          <span class="stat-label">✅ Bons pronostics</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">${entry.successRate}%</span>
+          <span class="stat-label">🎯 Réussite</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">${entry.streak}</span>
+          <span class="stat-label">🔥 Meilleure série</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">#${rank}</span>
+          <span class="stat-label">🏆 Classement</span>
+        </div>
+      `;
+
+      msgEl.textContent = getMotivationalMessage(rank, leaderboard.length, entry);
+    }
+
+    /**
+     * Get a motivational message based on the user's rank.
+     * @param {number} rank - User's current rank
+     * @param {number} total - Total number of players
+     * @param {Object} entry - Leaderboard entry
+     * @returns {string} Motivational message
+     */
+    function getMotivationalMessage(rank, total, entry) {
+      if (total === 0) return '';
+      if (rank === 1) return '👑 Tu mènes la danse ! Continue comme ça !';
+      if (rank === 2) return '🥈 Presque au sommet ! Un effort et tu y es !';
+      if (rank === 3) return '🥉 Sur le podium ! La première place est à portée !';
+      if (rank <= Math.ceil(total * 0.25)) return '📈 Dans le top 25% ! Tu assures vraiment !';
+      if (rank <= Math.ceil(total * 0.5)) return '💡 Dans la bonne moitié ! Continue tes efforts !';
+      if (rank === total) return '💪 Tu peux remonter ! Chaque pari compte !';
+      return '🎯 Reste concentré, la remontée est possible !';
+    }
+
+    /**
+     * Render the full leaderboard table with staggered animation.
+     */
+    function renderLeaderboard() {
+      const tbody = document.getElementById('leaderboard-body');
+
+      if (leaderboard.length === 0) {
+        tbody.innerHTML = `<tr class="visible"><td colspan="6" style="text-align:center;color:var(--color-text-muted);padding:32px;">
+          Aucun joueur inscrit pour l'instant. Sois le premier ! 🚀
+        </td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = leaderboard.map((entry, index) => {
+        const rank = index + 1;
+        const isCurrent = entry.user.id === currentUser.id;
+        const badgeClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+        const rankDisplay = rank <= 3
+          ? `<span class="rank-badge ${badgeClass}">${rank}</span>`
+          : `<span class="rank-badge">${rank}</span>`;
+
+        return `
+          <tr class="${isCurrent ? 'current-user' : ''}" style="transition-delay:${index * 50}ms">
+            <td>${rankDisplay}</td>
+            <td>
+              ${escapeHtml(entry.user.username)}
+              ${isCurrent ? ' <span style="color:var(--color-gold);font-size:0.75rem;">◀ toi</span>' : ''}
+            </td>
+            <td>${entry.correctBets}</td>
+            <td>${entry.totalBets}</td>
+            <td>
+              <div class="success-rate-bar">
+                <div class="rate-bar"><div class="rate-fill" style="width:${entry.successRate}%"></div></div>
+                <span style="font-size:0.8rem;color:var(--color-text-muted);min-width:36px;">${entry.successRate}%</span>
+              </div>
+            </td>
+            <td><strong style="font-family:var(--font-mono);color:var(--color-bg-dark);">${entry.points}</strong></td>
+          </tr>
+        `;
+      }).join('');
+
+      // Staggered fade-in animation
+      requestAnimationFrame(() => {
+        tbody.querySelectorAll('tr').forEach((row, i) => {
+          setTimeout(() => row.classList.add('visible'), i * 50);
+        });
+      });
+    }
+
+    /**
+     * Set up the hidden admin panel (Shift+A to toggle).
+     */
+    function setupAdminPanel() {
+      const panel = document.getElementById('admin-panel');
+      const matchSelect = document.getElementById('admin-match-select');
+      const resultSelect = document.getElementById('admin-result-select');
+      const submitBtn = document.getElementById('admin-submit-btn');
+      const resultMsg = document.getElementById('admin-result-msg');
+
+      // Populate match dropdown
+      const matches = getMatches();
+      matchSelect.innerHTML = '<option value="">-- Sélectionner un match --</option>' +
+        matches.map(m => `<option value="${escapeHtml(m.id)}">
+          ${m.flagA} ${escapeHtml(m.teamA)} vs ${m.flagB} ${escapeHtml(m.teamB)} (${escapeHtml(m.stage)})
+          ${m.result ? ' ✓' : ''}
+        </option>`).join('');
+
+      // Toggle panel with Shift+A
+      document.addEventListener('keydown', e => {
+        if (e.shiftKey && e.key === 'A') {
+          panel.classList.toggle('visible');
+        }
+      });
+
+      // Validate result
+      submitBtn.addEventListener('click', () => {
+        const matchId = matchSelect.value;
+        const result = resultSelect.value;
+
+        if (!matchId || !result) {
+          resultMsg.style.color = 'var(--color-error)';
+          resultMsg.textContent = '⚠️ Sélectionne un match et un résultat.';
+          return;
+        }
+
+        // Update match result
+        const matches = getMatches();
+        const match = matches.find(m => m.id === matchId);
+        if (!match) return;
+
+        match.result = result;
+        saveMatches(matches);
+
+        // Recalculate bets and points
+        const correctCount = recalculateMatch(matchId);
+
+        // Update the option in the dropdown to reflect the result
+        const option = matchSelect.querySelector(`option[value="${matchId}"]`);
+        if (option && !option.textContent.includes('✓')) {
+          option.textContent += ' ✓';
+        }
+
+        resultMsg.style.color = '#2ecc71';
+        resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match !`;
+
+        showToast('Résultat enregistré !', 'success');
+
+        // Refresh the page stats
+        leaderboard = computeLeaderboard();
+        renderPodium();
+        renderPersonalStats();
+        renderLeaderboard();
+      });
+    }
+
+    /**
+     * Set up export/import profile buttons.
+     */
+    function setupProfileActions() {
+      document.getElementById('export-btn').addEventListener('click', () => {
+        exportProfile(currentUser);
+        showToast('Profil exporté ! 📥', 'success');
+      });
+
+      document.getElementById('import-file').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const result = await importProfile(file);
+        if (result.success) {
+          currentUser = getCurrentUser();
+          showToast('Profil importé avec succès ! 🎉', 'success');
+          leaderboard = computeLeaderboard();
+          renderPodium();
+          renderPersonalStats();
+          renderLeaderboard();
+          renderNavbar('stats');
+        } else {
+          showToast(result.error, 'error');
+        }
+        // Reset file input
+        e.target.value = '';
+      });
+    }
+
+    initStatsPage();
+  </script>
+</body>
+</html>
