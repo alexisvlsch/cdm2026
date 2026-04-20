@@ -217,14 +217,23 @@ cp data/fixtures.json data/matches.json
 
 ## 🔧 Mettre à jour les résultats des matchs
 
-### Option 1 — Panneau Admin intégré (rapide)
-1. Va sur la page **Classement** (`stats.html`).
-2. Appuie sur **Shift+A** pour afficher le panneau admin.
-3. Sélectionne un match, choisis le résultat, puis clique **Valider le résultat**.
-4. Les points sont recalculés automatiquement.
-5. Avec Firebase : les résultats se propagent à tous en temps réel.
+### Option 1 — Panneau Admin intégré (rapide, recommandé au jour J)
 
-> ⚠️ Sans Firebase, cette méthode sauvegarde dans le localStorage de ton navigateur uniquement.
+C'est la méthode à utiliser **au fil des matchs**, sans toucher au code.
+
+1. Va sur la page **Classement** (`stats.html`).
+2. Appuie sur **Shift+A** (maintiens Maj et appuie sur A) — un panneau admin caché apparaît en bas de la page. Rappuie sur **Shift+A** pour le fermer.
+3. Dans le menu déroulant **"Sélectionner un match"**, choisis le match dont tu veux entrer le résultat. Les matchs déjà renseignés sont marqués d'un **✓**.
+4. Dans le menu **"Résultat"**, sélectionne :
+   - **Équipe A gagne** — l'équipe listée à gauche a gagné
+   - **Match nul** — match terminé à égalité
+   - **Équipe B gagne** — l'équipe listée à droite a gagné
+5. Clique **Valider le résultat**.
+6. L'app affiche immédiatement combien de joueurs ont bien pronostiqué ce match, et le podium + classement se rafraîchissent automatiquement.
+
+**Avec Firebase configuré** : le résultat est sauvegardé dans Firestore et **tous les joueurs voient leur classement mis à jour en temps réel**, sans avoir à recharger la page.
+
+> ⚠️ **Sans Firebase** : le résultat n'est sauvegardé que dans le localStorage de *ton* navigateur. Les autres joueurs ne verront rien tant que tu n'as pas commité les données (voir Option 2).
 
 ### Option 2 — Édition directe du fichier JSON (persistant pour tous)
 1. Édite `data/fixtures.json` et modifie le champ `result` du match concerné :
