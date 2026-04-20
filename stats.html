@@ -75,6 +75,7 @@
             <option value="teamA">Équipe A gagne</option>
             <option value="draw">Match nul</option>
             <option value="teamB">Équipe B gagne</option>
+            <option value="reset">🔄 Réinitialiser (pas encore joué)</option>
           </select>
         </div>
         <button class="btn btn-danger" id="admin-submit-btn">
@@ -305,19 +306,33 @@
           return;
         }
 
-        // Update match result and persist to Firestore
-        const correctCount = setMatchResult(matchId, result);
-
-        // Update the option in the dropdown to reflect the result
         const option = matchSelect.querySelector(`option[value="${matchId}"]`);
-        if (option && !option.textContent.includes('✓')) {
-          option.textContent += ' ✓';
+
+        if (result === 'reset') {
+          // Clear the match result and recalculate scores
+          resetMatchResult(matchId);
+
+          // Remove the ✓ indicator from the dropdown option
+          if (option) {
+            option.textContent = option.textContent.replace(/\s*✓$/, '');
+          }
+
+          resultMsg.style.color = '#2ecc71';
+          resultMsg.textContent = '🔄 Résultat réinitialisé. Le match est de nouveau sans résultat.';
+          showToast('Résultat réinitialisé !', 'success');
+        } else {
+          // Update match result and persist to Firestore
+          const correctCount = setMatchResult(matchId, result);
+
+          // Update the option in the dropdown to reflect the result
+          if (option && !option.textContent.includes('✓')) {
+            option.textContent += ' ✓';
+          }
+
+          resultMsg.style.color = '#2ecc71';
+          resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match !`;
+          showToast('Résultat enregistré !', 'success');
         }
-
-        resultMsg.style.color = '#2ecc71';
-        resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match !`;
-
-        showToast('Résultat enregistré !', 'success');
 
         // Refresh the page stats
         leaderboard = computeLeaderboard();
