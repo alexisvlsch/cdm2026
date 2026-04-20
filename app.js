@@ -544,7 +544,7 @@ function resetMatchResult(matchId) {
   // Remove the result document from Firestore so other devices see the reset
   if (db) {
     db.collection('matches').doc(matchId).delete()
-      .catch(e => debugLog('Firestore: delete match result failed', e));
+      .catch(e => debugLog(`Firestore: delete match result failed for match ${matchId}`, e));
   }
 
   // Reset isCorrect for all bets on this match
