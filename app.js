@@ -528,6 +528,39 @@ function setMatchResult(matchId, result) {
   return recalculateMatch(matchId);
 }
 
+/**
+ * Reset a match result back to null (not played), clearing it from localStorage and
+ * Firestore, resetting all related bets, and recalculating user points.
+ * @param {string} matchId - Match ID
+ */
+function resetMatchResult(matchId) {
+  const matches = getMatches();
+  const match = matches.find(m => m.id === matchId);
+  if (!match) return;
+
+  match.result = null;
+  saveMatches(matches);
+
+  // Remove the result document from Firestore so other devices see the reset
+  if (db) {
+    db.collection('matches').doc(matchId).delete()
+      .catch(e => debugLog('Firestore: delete match result failed', e));
+  }
+
+  // Reset isCorrect for all bets on this match
+  const bets = getBets();
+  for (const bet of bets) {
+    if (bet.matchId === matchId) {
+      bet.isCorrect = null;
+    }
+  }
+  saveBets(bets);
+  fbSaveBets(bets.filter(b => b.matchId === matchId));
+
+  // Recalculate all user points from scratch
+  recalculateAllPoints();
+}
+
 // === POINTS & SCORING ===
 
 /**
