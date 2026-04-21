@@ -26,15 +26,6 @@
       <h3 class="personal-stats-title">📊 Mes statistiques</h3>
       <div class="stats-grid" id="stats-grid"></div>
       <p class="motivational-msg" id="motivational-msg"></p>
-      <div class="profile-actions">
-        <button class="btn btn-outline" id="export-btn">
-          <i class="fas fa-download"></i> Exporter mon profil
-        </button>
-        <label class="btn btn-outline" style="cursor:pointer;">
-          <i class="fas fa-upload"></i> Importer un profil
-          <input type="file" id="import-file" accept=".json" style="display:none;" />
-        </label>
-      </div>
     </section>
 
     <!-- Leaderboard table -->
@@ -121,7 +112,6 @@
       renderPersonalStats();
       renderLeaderboard();
       setupAdminPanel();
-      setupProfileActions();
     }
 
     /**
@@ -339,35 +329,6 @@
         renderPodium();
         renderPersonalStats();
         renderLeaderboard();
-      });
-    }
-
-    /**
-     * Set up export/import profile buttons.
-     */
-    function setupProfileActions() {
-      document.getElementById('export-btn').addEventListener('click', () => {
-        exportProfile(currentUser);
-        showToast('Profil exporté ! 📥', 'success');
-      });
-
-      document.getElementById('import-file').addEventListener('change', async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const result = await importProfile(file);
-        if (result.success) {
-          currentUser = getCurrentUser();
-          showToast('Profil importé avec succès ! 🎉', 'success');
-          leaderboard = computeLeaderboard();
-          renderPodium();
-          renderPersonalStats();
-          renderLeaderboard();
-          renderNavbar('stats');
-        } else {
-          showToast(result.error, 'error');
-        }
-        // Reset file input
-        e.target.value = '';
       });
     }
 

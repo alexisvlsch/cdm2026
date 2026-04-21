@@ -698,69 +698,6 @@ function computeStreak(userBets, matches) {
   return best;
 }
 
-// === EXPORT / IMPORT ===
-
-/**
- * Export the current user's profile and bets as a downloadable JSON file.
- * @param {Object} user - User object to export
- */
-function exportProfile(user) {
-  const bets = getBets().filter(b => b.userId === user.id);
-  const data = { user, bets, exportedAt: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `wc2026_${user.username}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Import a user profile from a JSON file (File object).
- * @param {File} file - JSON file to import
- * @returns {Promise<{success: boolean, error?: string}>}
- */
-async function importProfile(file) {
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if (!data.user || !data.user.id || !data.user.username) {
-      return { success: false, error: 'Fichier de profil invalide.' };
-    }
-
-    const users = getUsers();
-    const idx = users.findIndex(u => u.id === data.user.id);
-    if (idx >= 0) {
-      users[idx] = data.user;
-    } else {
-      users.push(data.user);
-    }
-    saveUsers(users);
-
-    if (data.bets && Array.isArray(data.bets)) {
-      const bets = getBets();
-      for (const importedBet of data.bets) {
-        const existing = bets.findIndex(b => b.id === importedBet.id);
-        if (existing >= 0) {
-          bets[existing] = importedBet;
-        } else {
-          bets.push(importedBet);
-        }
-      }
-      saveBets(bets);
-    }
-
-    setCurrentUser(data.user);
-    return { success: true };
-  } catch (e) {
-    debugLog('importProfile error', e);
-    return { success: false, error: 'Erreur lors de la lecture du fichier.' };
-  }
-}
-
 // === UUID GENERATOR ===
 
 /**
