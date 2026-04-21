@@ -86,6 +86,16 @@ function fbSaveMatchResult(match) {
 }
 
 /**
+ * Delete a bet document from Firestore (fire-and-forget).
+ * @param {string} betId - ID of the bet to delete
+ */
+function fbDeleteBet(betId) {
+  if (!db) return;
+  db.collection('bets').doc(betId).delete()
+    .catch(e => debugLog('Firestore: delete bet failed', e));
+}
+
+/**
  * Batch-update multiple bet documents in Firestore (fire-and-forget).
  * @param {Array} bets - Array of bet objects to update
  */
@@ -460,6 +470,29 @@ function placeBet(userId, matchId, prediction) {
   saveBets(bets);
   // Persist to Firestore if available
   fbSaveBet(bet);
+  return { success: true };
+}
+
+/**
+ * Remove an existing bet for the current user on a match.
+ * @param {string} userId - User ID
+ * @param {string} matchId - Match ID
+ * @returns {{success: boolean, error?: string}}
+ */
+function removeBet(userId, matchId) {
+  const matches = getMatches();
+  const match = matches.find(m => m.id === matchId);
+  if (!match) return { success: false, error: 'Match introuvable.' };
+  if (isBetLocked(match)) return { success: false, error: 'Le pari est verrouillé pour ce match.' };
+
+  const bets = getBets();
+  const existing = bets.findIndex(b => b.userId === userId && b.matchId === matchId);
+  if (existing < 0) return { success: true };
+
+  const betId = bets[existing].id;
+  bets.splice(existing, 1);
+  saveBets(bets);
+  fbDeleteBet(betId);
   return { success: true };
 }
 
