@@ -349,6 +349,20 @@
       const matchId = btn.dataset.matchId;
       const prediction = btn.dataset.prediction;
 
+      // If the user clicks the already-selected button, deselect it
+      const existingBet = getUserBet(currentUser.id, matchId);
+      if (existingBet && existingBet.prediction === prediction) {
+        const result = removeBet(currentUser.id, matchId);
+        if (!result.success) {
+          showToast(result.error, 'error');
+          return;
+        }
+        allBets = getBets();
+        showToast('Pari annulé 🗑️', 'info');
+        renderMatches();
+        return;
+      }
+
       const result = placeBet(currentUser.id, matchId, prediction);
       if (!result.success) {
         showToast(result.error, 'error');
