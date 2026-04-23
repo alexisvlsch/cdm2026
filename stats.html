@@ -325,8 +325,8 @@
         if (match) {
           teamALabel.textContent = `${match.flagA} ${match.teamA}`;
           teamBLabel.textContent = `${match.flagB} ${match.teamB}`;
-          scoreAInput.value = match.resultScoreA != null ? match.resultScoreA : 0;
-          scoreBInput.value = match.resultScoreB != null ? match.resultScoreB : 0;
+          scoreAInput.value = match.resultScoreA ?? 0;
+          scoreBInput.value = match.resultScoreB ?? 0;
         } else {
           teamALabel.textContent = 'Équipe A';
           teamBLabel.textContent = 'Équipe B';
@@ -342,12 +342,7 @@
       // Stepper buttons
       panel.querySelectorAll('.admin-stepper-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const inputId = btn.dataset.target;
-          const dir = parseInt(btn.dataset.dir, 10);
-          const input = document.getElementById(inputId);
-          if (!input) return;
-          const current = parseInt(input.value, 10);
-          input.value = Math.max(0, Math.min(99, (isNaN(current) ? 0 : current) + dir));
+          adjustScoreInput(btn.dataset.target, parseInt(btn.dataset.dir, 10));
           updateDerivedResult();
         });
       });
