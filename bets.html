@@ -229,6 +229,18 @@
       grid.querySelectorAll('.btn-exact-submit').forEach(btn => {
         btn.addEventListener('click', () => handleExactScoreSubmit(btn));
       });
+
+      // Attach score stepper button listeners
+      grid.querySelectorAll('.score-stepper-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const inputId = btn.dataset.target;
+          const dir = parseInt(btn.dataset.dir, 10);
+          const input = document.getElementById(inputId);
+          if (!input) return;
+          const current = parseInt(input.value, 10);
+          input.value = Math.max(0, Math.min(99, (isNaN(current) ? 0 : current) + dir));
+        });
+      });
     }
 
     /**
@@ -397,17 +409,25 @@
               <div class="exact-score-team">
                 <span class="exact-team-flag">${match.flagA}</span>
                 <span class="exact-team-name">${escapeHtml(match.teamA)}</span>
-                <input type="number" class="score-input" min="0" max="99"
-                  id="scoreA-${matchId}" value="${savedScoreA}"
-                  placeholder="0" aria-label="Score ${escapeHtml(match.teamA)}" />
+                <div class="score-stepper">
+                  <button type="button" class="score-stepper-btn" data-target="scoreA-${matchId}" data-dir="-1" aria-label="Diminuer le score ${escapeHtml(match.teamA)}">−</button>
+                  <input type="number" class="score-input" min="0" max="99"
+                    id="scoreA-${matchId}" value="${savedScoreA}"
+                    placeholder="0" aria-label="Score ${escapeHtml(match.teamA)}" />
+                  <button type="button" class="score-stepper-btn" data-target="scoreA-${matchId}" data-dir="1" aria-label="Augmenter le score ${escapeHtml(match.teamA)}">+</button>
+                </div>
               </div>
               <span class="exact-separator">–</span>
               <div class="exact-score-team">
                 <span class="exact-team-flag">${match.flagB}</span>
                 <span class="exact-team-name">${escapeHtml(match.teamB)}</span>
-                <input type="number" class="score-input" min="0" max="99"
-                  id="scoreB-${matchId}" value="${savedScoreB}"
-                  placeholder="0" aria-label="Score ${escapeHtml(match.teamB)}" />
+                <div class="score-stepper">
+                  <button type="button" class="score-stepper-btn" data-target="scoreB-${matchId}" data-dir="-1" aria-label="Diminuer le score ${escapeHtml(match.teamB)}">−</button>
+                  <input type="number" class="score-input" min="0" max="99"
+                    id="scoreB-${matchId}" value="${savedScoreB}"
+                    placeholder="0" aria-label="Score ${escapeHtml(match.teamB)}" />
+                  <button type="button" class="score-stepper-btn" data-target="scoreB-${matchId}" data-dir="1" aria-label="Augmenter le score ${escapeHtml(match.teamB)}">+</button>
+                </div>
               </div>
             </div>
             <button class="btn btn-primary btn-exact-submit" data-match-id="${matchId}">
