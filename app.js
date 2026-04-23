@@ -465,6 +465,10 @@ function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
   const isExact = scoreA !== null && scoreB !== null;
 
   if (isExact) {
+    // Validate scores are non-negative integers
+    if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0) {
+      return { success: false, error: 'Les scores doivent être des nombres entiers positifs.' };
+    }
     // Derive the winner prediction from the entered scores
     if (scoreA > scoreB) prediction = 'teamA';
     else if (scoreB > scoreA) prediction = 'teamB';
