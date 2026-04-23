@@ -675,6 +675,150 @@ input {
 .result-badge.correct { background: var(--color-success); color: white; }
 .result-badge.wrong { background: var(--color-error); color: white; }
 
+/* === BET TYPE TABS === */
+.bet-type-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  background: var(--color-card-alt);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+
+.bet-type-tab {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all var(--transition);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.bet-type-tab.active {
+  background: var(--color-bg-dark);
+  color: var(--color-text-light);
+}
+
+.pts-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.15);
+}
+
+.pts-exact {
+  background: rgba(255, 215, 0, 0.3);
+  color: var(--color-gold-dark);
+}
+
+.bet-type-tab.active .pts-badge { background: rgba(255,255,255,0.2); }
+.bet-type-tab.active .pts-exact { background: rgba(255, 215, 0, 0.4); color: var(--color-gold); }
+
+/* === BET PANELS === */
+.bet-panel { display: none; }
+.bet-panel.active { display: block; }
+
+/* === EXACT SCORE INPUTS === */
+.exact-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.exact-score-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.exact-team-flag { font-size: 1.5rem; }
+.exact-team-name {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  text-align: center;
+}
+
+.score-input {
+  width: 64px;
+  padding: 8px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 1.4rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text-dark);
+  background: var(--color-card);
+  transition: border-color var(--transition), box-shadow var(--transition);
+  -moz-appearance: textfield;
+}
+
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.score-input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2);
+}
+
+.exact-separator {
+  font-size: 1.8rem;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin-top: 28px;
+}
+
+.btn-exact-submit {
+  width: 100%;
+  padding: 9px 16px;
+  font-size: 0.9rem;
+}
+
+/* === ADMIN SCORE INPUTS === */
+.admin-score-input {
+  width: 70px;
+  padding: 8px 10px;
+  border: 1px solid #555;
+  border-radius: var(--radius-sm);
+  background: #2a2a2a;
+  color: #eee;
+  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.admin-score-input::-webkit-outer-spin-button,
+.admin-score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.admin-score-input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+}
+
 /* === STATS PAGE === */
 .stats-page-bg {
   background: var(--color-bg-dark);
