@@ -793,6 +793,38 @@ input {
   font-size: 0.9rem;
 }
 
+/* === SCORE STEPPER BUTTONS === */
+.score-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.score-stepper-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text-dark);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.score-stepper-btn:hover {
+  background: var(--color-gold);
+  border-color: var(--color-gold-dark);
+  color: var(--color-text-dark);
+}
+
 /* === ADMIN SCORE INPUTS === */
 .admin-score-input {
   width: 70px;
@@ -817,6 +849,39 @@ input {
 .admin-score-input:focus {
   outline: none;
   border-color: var(--color-gold);
+}
+
+.admin-stepper-btn {
+  border-color: #555;
+  background: #2a2a40;
+  color: #eee;
+}
+
+.admin-stepper-btn:hover {
+  background: var(--color-gold);
+  border-color: var(--color-gold-dark);
+  color: #1a1a2e;
+}
+
+.admin-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-team-label {
+  color: #ccc;
+  font-weight: 600;
+  font-size: 0.85rem;
+  min-width: 70px;
+  text-align: center;
+}
+
+.admin-derived-result {
+  color: #9ecaed;
+  font-size: 0.85rem;
+  margin-top: 6px;
 }
 
 /* === STATS PAGE === */

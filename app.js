@@ -869,6 +869,21 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// === SCORE STEPPER UTILITY ===
+
+/**
+ * Increment or decrement a numeric score input by one step, clamped to [0, 99].
+ * Used by the +/− stepper buttons on both the bets and admin pages.
+ * @param {string} inputId - The id of the <input> element to adjust
+ * @param {number} dir - +1 to increment, -1 to decrement
+ */
+function adjustScoreInput(inputId, dir) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const current = parseInt(input.value, 10);
+  input.value = Math.max(0, Math.min(99, (isNaN(current) ? 0 : current) + dir));
+}
+
 // === FIREBASE AUTO-INIT ===
 // Attempt to initialize Firebase immediately when app.js is loaded.
 // firebase-config.js (if present) must be loaded before app.js.

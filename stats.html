@@ -59,27 +59,33 @@
           <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Sélectionne un match</label>
           <select class="admin-select" id="admin-match-select"></select>
         </div>
-        <div>
-          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Résultat</label>
-          <select class="admin-select" id="admin-result-select">
-            <option value="">-- Choisir un résultat --</option>
-            <option value="teamA">Équipe A gagne</option>
-            <option value="draw">Match nul</option>
-            <option value="teamB">Équipe B gagne</option>
-            <option value="reset">🔄 Réinitialiser (pas encore joué)</option>
-          </select>
-        </div>
-        <div id="admin-score-section" style="display:none;">
-          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Score exact (optionnel — active les paris à +3 pts)</label>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input type="number" id="admin-score-a" class="admin-score-input" min="0" max="99" placeholder="0" aria-label="Score équipe A" />
-            <span style="color:#aaa;font-size:1.2rem;">–</span>
-            <input type="number" id="admin-score-b" class="admin-score-input" min="0" max="99" placeholder="0" aria-label="Score équipe B" />
+        <div id="admin-score-section">
+          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:8px;">Score exact</label>
+          <div class="admin-score-row">
+            <span class="admin-team-label" id="admin-team-a-label">Équipe A</span>
+            <div class="score-stepper">
+              <button type="button" class="score-stepper-btn admin-stepper-btn" data-target="admin-score-a" data-dir="-1" aria-label="Diminuer le score équipe A">−</button>
+              <input type="number" id="admin-score-a" class="admin-score-input" min="0" max="99" value="0" aria-label="Score équipe A" />
+              <button type="button" class="score-stepper-btn admin-stepper-btn" data-target="admin-score-a" data-dir="1" aria-label="Augmenter le score équipe A">+</button>
+            </div>
+            <span style="color:#aaa;font-size:1.5rem;font-weight:700;padding:0 4px;">–</span>
+            <div class="score-stepper">
+              <button type="button" class="score-stepper-btn admin-stepper-btn" data-target="admin-score-b" data-dir="-1" aria-label="Diminuer le score équipe B">−</button>
+              <input type="number" id="admin-score-b" class="admin-score-input" min="0" max="99" value="0" aria-label="Score équipe B" />
+              <button type="button" class="score-stepper-btn admin-stepper-btn" data-target="admin-score-b" data-dir="1" aria-label="Augmenter le score équipe B">+</button>
+            </div>
+            <span class="admin-team-label" id="admin-team-b-label">Équipe B</span>
           </div>
+          <div class="admin-derived-result" id="admin-derived-result">Résultat dérivé : <strong>--</strong></div>
         </div>
-        <button class="btn btn-danger" id="admin-submit-btn">
-          <i class="fas fa-check"></i> Valider le résultat
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-danger" id="admin-submit-btn" style="flex:1;">
+            <i class="fas fa-check"></i> Valider le résultat
+          </button>
+          <button class="btn" id="admin-reset-btn" style="flex:0 0 auto;background:#333;color:#e74c3c;border:1px solid #e74c3c;border-radius:var(--radius-sm);padding:8px 16px;font-size:0.9rem;">
+            <i class="fas fa-undo"></i> Réinitialiser
+          </button>
+        </div>
         <p class="admin-result-msg" id="admin-result-msg"></p>
         <p style="color:#666;font-size:0.75rem;margin-top:8px;">
           💡 En production : exporter les données et commiter dans /data/
@@ -274,12 +280,14 @@
     function setupAdminPanel() {
       const panel = document.getElementById('admin-panel');
       const matchSelect = document.getElementById('admin-match-select');
-      const resultSelect = document.getElementById('admin-result-select');
       const submitBtn = document.getElementById('admin-submit-btn');
+      const resetBtn = document.getElementById('admin-reset-btn');
       const resultMsg = document.getElementById('admin-result-msg');
-      const scoreSection = document.getElementById('admin-score-section');
       const scoreAInput = document.getElementById('admin-score-a');
       const scoreBInput = document.getElementById('admin-score-b');
+      const derivedResultEl = document.getElementById('admin-derived-result');
+      const teamALabel = document.getElementById('admin-team-a-label');
+      const teamBLabel = document.getElementById('admin-team-b-label');
 
       // Populate match dropdown
       const matches = getMatches();
@@ -289,14 +297,54 @@
           ${m.result ? ' ✓' : ''}
         </option>`).join('');
 
-      // Show/hide score inputs based on result selection
-      resultSelect.addEventListener('change', () => {
-        const val = resultSelect.value;
-        scoreSection.style.display = (val && val !== 'reset') ? 'block' : 'none';
-        if (val === 'reset' || !val) {
-          scoreAInput.value = '';
-          scoreBInput.value = '';
+      // Auto-derive result label from current score inputs
+      function updateDerivedResult() {
+        const rawA = scoreAInput.value.trim();
+        const rawB = scoreBInput.value.trim();
+        if (rawA === '' || rawB === '') {
+          derivedResultEl.innerHTML = 'Résultat dérivé : <strong>--</strong>';
+          return;
         }
+        const a = parseInt(rawA, 10);
+        const b = parseInt(rawB, 10);
+        if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
+          derivedResultEl.innerHTML = 'Résultat dérivé : <strong style="color:var(--color-error);">⚠️ Invalide</strong>';
+          return;
+        }
+        let label;
+        if (a > b) label = `🏆 ${teamALabel.textContent} gagne`;
+        else if (b > a) label = `🏆 ${teamBLabel.textContent} gagne`;
+        else label = '🤝 Match nul';
+        derivedResultEl.innerHTML = `Résultat dérivé : <strong>${label}</strong>`;
+      }
+
+      // Update team name labels and prefill scores when a match is selected
+      matchSelect.addEventListener('change', () => {
+        const matchId = matchSelect.value;
+        const match = matches.find(m => m.id === matchId);
+        if (match) {
+          teamALabel.textContent = `${match.flagA} ${match.teamA}`;
+          teamBLabel.textContent = `${match.flagB} ${match.teamB}`;
+          scoreAInput.value = match.resultScoreA ?? 0;
+          scoreBInput.value = match.resultScoreB ?? 0;
+        } else {
+          teamALabel.textContent = 'Équipe A';
+          teamBLabel.textContent = 'Équipe B';
+          scoreAInput.value = 0;
+          scoreBInput.value = 0;
+        }
+        updateDerivedResult();
+      });
+
+      scoreAInput.addEventListener('input', updateDerivedResult);
+      scoreBInput.addEventListener('input', updateDerivedResult);
+
+      // Stepper buttons
+      panel.querySelectorAll('.admin-stepper-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          adjustScoreInput(btn.dataset.target, parseInt(btn.dataset.dir, 10));
+          updateDerivedResult();
+        });
       });
 
       // Toggle panel with Shift+A
@@ -306,72 +354,78 @@
         }
       });
 
-      // Validate result
+      // Validate and save result
       submitBtn.addEventListener('click', () => {
         const matchId = matchSelect.value;
-        const result = resultSelect.value;
-
-        if (!matchId || !result) {
+        if (!matchId) {
           resultMsg.style.color = 'var(--color-error)';
-          resultMsg.textContent = '⚠️ Sélectionne un match et un résultat.';
+          resultMsg.textContent = '⚠️ Sélectionne un match.';
+          return;
+        }
+
+        const rawA = scoreAInput.value.trim();
+        const rawB = scoreBInput.value.trim();
+        if (rawA === '' || rawB === '') {
+          resultMsg.style.color = 'var(--color-error)';
+          resultMsg.textContent = '⚠️ Entre les deux scores.';
+          return;
+        }
+
+        const resultScoreA = parseInt(rawA, 10);
+        const resultScoreB = parseInt(rawB, 10);
+        if (isNaN(resultScoreA) || isNaN(resultScoreB) || resultScoreA < 0 || resultScoreB < 0) {
+          resultMsg.style.color = 'var(--color-error)';
+          resultMsg.textContent = '⚠️ Les scores doivent être des nombres positifs.';
+          return;
+        }
+
+        // Derive result from scores
+        let result;
+        if (resultScoreA > resultScoreB) result = 'teamA';
+        else if (resultScoreB > resultScoreA) result = 'teamB';
+        else result = 'draw';
+
+        const option = matchSelect.querySelector(`option[value="${matchId}"]`);
+        const correctCount = setMatchResult(matchId, result, resultScoreA, resultScoreB);
+
+        if (option && !option.textContent.includes('✓')) {
+          option.textContent += ' ✓';
+        }
+
+        resultMsg.style.color = '#2ecc71';
+        resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match (${resultScoreA}–${resultScoreB}) !`;
+        showToast('Résultat enregistré !', 'success');
+
+        leaderboard = computeLeaderboard();
+        renderPodium();
+        renderPersonalStats();
+        renderLeaderboard();
+      });
+
+      // Reset result
+      resetBtn.addEventListener('click', () => {
+        const matchId = matchSelect.value;
+        if (!matchId) {
+          resultMsg.style.color = 'var(--color-error)';
+          resultMsg.textContent = '⚠️ Sélectionne un match.';
           return;
         }
 
         const option = matchSelect.querySelector(`option[value="${matchId}"]`);
+        resetMatchResult(matchId);
 
-        if (result === 'reset') {
-          // Clear the match result and recalculate scores
-          resetMatchResult(matchId);
-
-          // Remove the ✓ indicator from the dropdown option
-          if (option) {
-            option.textContent = option.textContent.replace(/\s*✓$/, '');
-          }
-
-          resultMsg.style.color = '#2ecc71';
-          resultMsg.textContent = '🔄 Résultat réinitialisé. Le match est de nouveau sans résultat.';
-          showToast('Résultat réinitialisé !', 'success');
-        } else {
-          // Parse optional scores
-          let resultScoreA = null;
-          let resultScoreB = null;
-          const rawA = scoreAInput.value.trim();
-          const rawB = scoreBInput.value.trim();
-          if (rawA !== '' && rawB !== '') {
-            resultScoreA = parseInt(rawA, 10);
-            resultScoreB = parseInt(rawB, 10);
-            if (isNaN(resultScoreA) || isNaN(resultScoreB) || resultScoreA < 0 || resultScoreB < 0) {
-              resultMsg.style.color = 'var(--color-error)';
-              resultMsg.textContent = '⚠️ Les scores doivent être des nombres positifs.';
-              return;
-            }
-            // Check consistency: derive expected result from score
-            let derivedResult;
-            if (resultScoreA > resultScoreB) derivedResult = 'teamA';
-            else if (resultScoreB > resultScoreA) derivedResult = 'teamB';
-            else derivedResult = 'draw';
-            if (derivedResult !== result) {
-              resultMsg.style.color = 'var(--color-error)';
-              resultMsg.textContent = '⚠️ Le score est incohérent avec le résultat sélectionné.';
-              return;
-            }
-          }
-
-          // Update match result and persist to Firestore
-          const correctCount = setMatchResult(matchId, result, resultScoreA, resultScoreB);
-
-          // Update the option in the dropdown to reflect the result
-          if (option && !option.textContent.includes('✓')) {
-            option.textContent += ' ✓';
-          }
-
-          const scoreInfo = resultScoreA !== null ? ` (${resultScoreA}–${resultScoreB})` : '';
-          resultMsg.style.color = '#2ecc71';
-          resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match${scoreInfo} !`;
-          showToast('Résultat enregistré !', 'success');
+        if (option) {
+          option.textContent = option.textContent.replace(/\s*✓$/, '');
         }
 
-        // Refresh the page stats
+        scoreAInput.value = 0;
+        scoreBInput.value = 0;
+        updateDerivedResult();
+
+        resultMsg.style.color = '#2ecc71';
+        resultMsg.textContent = '🔄 Résultat réinitialisé. Le match est de nouveau sans résultat.';
+        showToast('Résultat réinitialisé !', 'success');
+
         leaderboard = computeLeaderboard();
         renderPodium();
         renderPersonalStats();
