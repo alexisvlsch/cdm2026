@@ -48,7 +48,7 @@
       </div>
     </section>
 
-    <!-- Admin panel (hidden, toggle with Shift+A) -->
+      <!-- Admin panel (hidden, toggle with Shift+A) -->
     <section class="admin-panel" id="admin-panel" aria-label="Panneau administrateur">
       <h3 class="admin-title">
         <i class="fas fa-lock"></i> Panneau Admin
@@ -68,6 +68,14 @@
             <option value="teamB">Équipe B gagne</option>
             <option value="reset">🔄 Réinitialiser (pas encore joué)</option>
           </select>
+        </div>
+        <div id="admin-score-section" style="display:none;">
+          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:6px;">Score exact (optionnel — active les paris à +3 pts)</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" id="admin-score-a" class="admin-score-input" min="0" max="99" placeholder="0" aria-label="Score équipe A" />
+            <span style="color:#aaa;font-size:1.2rem;">–</span>
+            <input type="number" id="admin-score-b" class="admin-score-input" min="0" max="99" placeholder="0" aria-label="Score équipe B" />
+          </div>
         </div>
         <button class="btn btn-danger" id="admin-submit-btn">
           <i class="fas fa-check"></i> Valider le résultat
@@ -269,6 +277,9 @@
       const resultSelect = document.getElementById('admin-result-select');
       const submitBtn = document.getElementById('admin-submit-btn');
       const resultMsg = document.getElementById('admin-result-msg');
+      const scoreSection = document.getElementById('admin-score-section');
+      const scoreAInput = document.getElementById('admin-score-a');
+      const scoreBInput = document.getElementById('admin-score-b');
 
       // Populate match dropdown
       const matches = getMatches();
@@ -277,6 +288,16 @@
           ${m.flagA} ${escapeHtml(m.teamA)} vs ${m.flagB} ${escapeHtml(m.teamB)} (${escapeHtml(m.stage)})
           ${m.result ? ' ✓' : ''}
         </option>`).join('');
+
+      // Show/hide score inputs based on result selection
+      resultSelect.addEventListener('change', () => {
+        const val = resultSelect.value;
+        scoreSection.style.display = (val && val !== 'reset') ? 'block' : 'none';
+        if (val === 'reset' || !val) {
+          scoreAInput.value = '';
+          scoreBInput.value = '';
+        }
+      });
 
       // Toggle panel with Shift+A
       document.addEventListener('keydown', e => {
@@ -311,16 +332,42 @@
           resultMsg.textContent = '🔄 Résultat réinitialisé. Le match est de nouveau sans résultat.';
           showToast('Résultat réinitialisé !', 'success');
         } else {
+          // Parse optional scores
+          let resultScoreA = null;
+          let resultScoreB = null;
+          const rawA = scoreAInput.value.trim();
+          const rawB = scoreBInput.value.trim();
+          if (rawA !== '' && rawB !== '') {
+            resultScoreA = parseInt(rawA, 10);
+            resultScoreB = parseInt(rawB, 10);
+            if (isNaN(resultScoreA) || isNaN(resultScoreB) || resultScoreA < 0 || resultScoreB < 0) {
+              resultMsg.style.color = 'var(--color-error)';
+              resultMsg.textContent = '⚠️ Les scores doivent être des nombres positifs.';
+              return;
+            }
+            // Check consistency: derive expected result from score
+            let derivedResult;
+            if (resultScoreA > resultScoreB) derivedResult = 'teamA';
+            else if (resultScoreB > resultScoreA) derivedResult = 'teamB';
+            else derivedResult = 'draw';
+            if (derivedResult !== result) {
+              resultMsg.style.color = 'var(--color-error)';
+              resultMsg.textContent = '⚠️ Le score est incohérent avec le résultat sélectionné.';
+              return;
+            }
+          }
+
           // Update match result and persist to Firestore
-          const correctCount = setMatchResult(matchId, result);
+          const correctCount = setMatchResult(matchId, result, resultScoreA, resultScoreB);
 
           // Update the option in the dropdown to reflect the result
           if (option && !option.textContent.includes('✓')) {
             option.textContent += ' ✓';
           }
 
+          const scoreInfo = resultScoreA !== null ? ` (${resultScoreA}–${resultScoreB})` : '';
           resultMsg.style.color = '#2ecc71';
-          resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match !`;
+          resultMsg.textContent = `✅ ${correctCount} joueur${correctCount > 1 ? 's ont' : ' a'} bien pronostiqué ce match${scoreInfo} !`;
           showToast('Résultat enregistré !', 'success');
         }
 

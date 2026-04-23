@@ -76,12 +76,15 @@ function fbSaveBet(bet) {
 
 /**
  * Save a match result to Firestore (fire-and-forget).
- * Only the id and result fields are stored to avoid overwriting fixture metadata.
+ * Only the id, result and optional score fields are stored to avoid overwriting fixture metadata.
  * @param {Object} match - Match object with result set
  */
 function fbSaveMatchResult(match) {
   if (!db) return;
-  db.collection('matches').doc(match.id).set({ id: match.id, result: match.result })
+  const payload = { id: match.id, result: match.result };
+  if (match.resultScoreA != null) payload.resultScoreA = match.resultScoreA;
+  if (match.resultScoreB != null) payload.resultScoreB = match.resultScoreB;
+  db.collection('matches').doc(match.id).set(payload)
     .catch(e => debugLog('Firestore: save match result failed', e));
 }
 
@@ -257,11 +260,14 @@ async function loadAllData() {
 
       // Apply Firestore match results so admin-set results are visible everywhere.
       const firestoreResults = new Map(
-        matchResultsSnap.docs.map(d => [d.data().id, d.data().result])
+        matchResultsSnap.docs.map(d => [d.data().id, d.data()])
       );
       for (const m of matches) {
         if (firestoreResults.has(m.id)) {
-          m.result = firestoreResults.get(m.id);
+          const data = firestoreResults.get(m.id);
+          m.result = data.result;
+          if (data.resultScoreA != null) m.resultScoreA = data.resultScoreA;
+          if (data.resultScoreB != null) m.resultScoreB = data.resultScoreB;
         }
       }
 
@@ -440,27 +446,52 @@ function getUserBet(userId, matchId) {
 
 /**
  * Place or update a bet for the current user on a match.
+ * For a simple bet, provide prediction ('teamA', 'teamB', 'draw').
+ * For an exact score bet, provide scoreA and scoreB (integers ≥ 0); prediction is
+ * derived automatically from the scores and betType is set to 'exact'.
  * @param {string} userId - User ID
  * @param {string} matchId - Match ID
- * @param {string} prediction - One of 'teamA', 'teamB', 'draw'
+ * @param {string|null} prediction - 'teamA', 'teamB', or 'draw' (ignored for exact bets)
+ * @param {number|null} [scoreA] - Exact score for team A (exact bet only)
+ * @param {number|null} [scoreB] - Exact score for team B (exact bet only)
  * @returns {{success: boolean, error?: string}}
  */
-function placeBet(userId, matchId, prediction) {
+function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
   const matches = getMatches();
   const match = matches.find(m => m.id === matchId);
   if (!match) return { success: false, error: 'Match introuvable.' };
   if (isBetLocked(match)) return { success: false, error: 'Le pari est verrouillé pour ce match.' };
 
+  const isExact = scoreA !== null && scoreB !== null;
+
+  if (isExact) {
+    // Derive the winner prediction from the entered scores
+    if (scoreA > scoreB) prediction = 'teamA';
+    else if (scoreB > scoreA) prediction = 'teamB';
+    else prediction = 'draw';
+  }
+
   const bets = getBets();
   const existing = bets.findIndex(b => b.userId === userId && b.matchId === matchId);
+
   const bet = {
     id: existing >= 0 ? bets[existing].id : generateUUID(),
     userId,
     matchId,
     prediction,
+    betType: isExact ? 'exact' : 'simple',
     placedAt: new Date().toISOString(),
     isCorrect: match.result !== null ? prediction === match.result : null,
+    isExactScore: null,
   };
+
+  if (isExact) {
+    bet.scoreA = scoreA;
+    bet.scoreB = scoreB;
+    if (match.result !== null && match.resultScoreA != null && match.resultScoreB != null) {
+      bet.isExactScore = scoreA === match.resultScoreA && scoreB === match.resultScoreB;
+    }
+  }
 
   if (existing >= 0) {
     bets[existing] = bet;
@@ -549,13 +580,22 @@ function formatDate(isoDate) {
  * result is shared across all devices via Firestore.
  * @param {string} matchId - Match ID
  * @param {string} result - 'teamA', 'draw', or 'teamB'
+ * @param {number|null} [resultScoreA] - Actual score for team A (optional)
+ * @param {number|null} [resultScoreB] - Actual score for team B (optional)
  * @returns {number} Count of correct bets
  */
-function setMatchResult(matchId, result) {
+function setMatchResult(matchId, result, resultScoreA = null, resultScoreB = null) {
   const matches = getMatches();
   const match = matches.find(m => m.id === matchId);
   if (!match) return 0;
   match.result = result;
+  if (resultScoreA !== null && resultScoreB !== null) {
+    match.resultScoreA = resultScoreA;
+    match.resultScoreB = resultScoreB;
+  } else {
+    delete match.resultScoreA;
+    delete match.resultScoreB;
+  }
   saveMatches(matches);
   fbSaveMatchResult(match);
   return recalculateMatch(matchId);
@@ -580,11 +620,12 @@ function resetMatchResult(matchId) {
       .catch(e => debugLog(`Firestore: delete match result failed for match ${matchId}`, e));
   }
 
-  // Reset isCorrect for all bets on this match
+  // Reset isCorrect and isExactScore for all bets on this match
   const bets = getBets();
   for (const bet of bets) {
     if (bet.matchId === matchId) {
       bet.isCorrect = null;
+      bet.isExactScore = null;
     }
   }
   saveBets(bets);
@@ -606,6 +647,7 @@ function recalculateMatch(matchId) {
   const match = matches.find(m => m.id === matchId);
   if (!match || match.result === null) return 0;
 
+  const hasScore = match.resultScoreA != null && match.resultScoreB != null;
   const bets = getBets();
   let correctCount = 0;
 
@@ -613,6 +655,11 @@ function recalculateMatch(matchId) {
     if (bet.matchId === matchId) {
       bet.isCorrect = bet.prediction === match.result;
       if (bet.isCorrect) correctCount++;
+      if (bet.betType === 'exact' && hasScore) {
+        bet.isExactScore = bet.scoreA === match.resultScoreA && bet.scoreB === match.resultScoreB;
+      } else {
+        bet.isExactScore = null;
+      }
     }
   }
   saveBets(bets);
@@ -627,6 +674,7 @@ function recalculateMatch(matchId) {
 
 /**
  * Recalculate all users' points from scratch based on all correct bets.
+ * Exact score bets award 3 points; correct-outcome-only bets award 1 point.
  */
 function recalculateAllPoints() {
   const users = getUsers();
@@ -634,7 +682,10 @@ function recalculateAllPoints() {
 
   const pointsMap = new Map(users.map(u => [u.id, 0]));
   for (const bet of bets) {
-    if (bet.isCorrect === true && pointsMap.has(bet.userId)) {
+    if (!pointsMap.has(bet.userId)) continue;
+    if (bet.isExactScore === true) {
+      pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 3);
+    } else if (bet.isCorrect === true) {
       pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 1);
     }
   }

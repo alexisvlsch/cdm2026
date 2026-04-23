@@ -213,11 +213,21 @@
 
       grid.innerHTML = matches.map(match => renderMatchCard(match)).join('');
 
-      // Attach bet button listeners
+      // Attach bet button listeners (simple bets)
       grid.querySelectorAll('.bet-btn').forEach(btn => {
         if (!btn.disabled) {
           btn.addEventListener('click', () => handleBetClick(btn));
         }
+      });
+
+      // Attach bet-type tab listeners
+      grid.querySelectorAll('.bet-type-tab').forEach(tab => {
+        tab.addEventListener('click', () => handleBetTypeTabClick(tab));
+      });
+
+      // Attach exact score submit button listeners
+      grid.querySelectorAll('.btn-exact-submit').forEach(btn => {
+        btn.addEventListener('click', () => handleExactScoreSubmit(btn));
       });
     }
 
@@ -277,14 +287,14 @@
       const getClass = (prediction) => {
         let cls = 'bet-btn';
         if (!locked) {
-          if (userBet && userBet.prediction === prediction) cls += ' selected';
+          if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' selected';
         } else {
           if (hasResult) {
             if (prediction === match.result) cls += ' correct';
-            else if (userBet && userBet.prediction === prediction) cls += ' wrong';
+            else if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' wrong';
             else cls += ' faded';
           } else {
-            if (userBet && userBet.prediction === prediction) cls += ' selected';
+            if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' selected';
           }
         }
         return cls;
@@ -293,36 +303,115 @@
       if (locked) buttonsDisabled = 'disabled';
 
       if (hasResult && userBet) {
-        const isCorrect = userBet.prediction === match.result;
-        if (isCorrect) {
-          statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
+        if (userBet.betType === 'exact') {
+          if (userBet.isExactScore === true) {
+            statusHtml = `<div class="bet-status correct">🎯 Score exact ! <span class="result-badge correct">+3 pts 🌟</span></div>`;
+          } else if (userBet.isCorrect === true) {
+            statusHtml = `<div class="bet-status correct">✅ Bonne équipe ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
+          } else {
+            statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+          }
         } else {
-          statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+          const isCorrect = userBet.prediction === match.result;
+          if (isCorrect) {
+            statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
+          } else {
+            statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+          }
         }
       } else if (hasResult && !userBet) {
         statusHtml = `<div class="bet-status no-bet">😬 Tu n'as pas parié sur ce match.</div>`;
       } else if (locked && !userBet) {
         statusHtml = `<div class="bet-status locked">🔒 Paris fermés. Tu n'as pas parié sur ce match.</div>`;
       } else if (locked && userBet) {
-        statusHtml = `<div class="bet-status locked">🔒 Pari verrouillé.</div>`;
+        if (userBet.betType === 'exact') {
+          statusHtml = `<div class="bet-status locked">🔒 Pari score exact verrouillé : <strong>${userBet.scoreA} – ${userBet.scoreB}</strong></div>`;
+        } else {
+          statusHtml = `<div class="bet-status locked">🔒 Pari verrouillé.</div>`;
+        }
       } else if (userBet) {
-        statusHtml = `<div class="bet-status saved">✓ Pari enregistré</div>`;
+        if (userBet.betType === 'exact') {
+          statusHtml = `<div class="bet-status saved">✓ Score exact enregistré : <strong>${userBet.scoreA} – ${userBet.scoreB}</strong></div>`;
+        } else {
+          statusHtml = `<div class="bet-status saved">✓ Pari enregistré</div>`;
+        }
+      }
+
+      // Determine active bet type tab for this match
+      const currentBetType = (userBet && userBet.betType === 'exact') ? 'exact' : 'simple';
+      const matchId = escapeHtml(match.id);
+
+      // Exact score section — show current values if bet exists
+      const savedScoreA = (userBet && userBet.betType === 'exact') ? userBet.scoreA : '';
+      const savedScoreB = (userBet && userBet.betType === 'exact') ? userBet.scoreB : '';
+
+      if (locked) {
+        // Locked: no tabs, just show the relevant buttons (read-only)
+        return `
+          <div class="bet-section">
+            <div class="bet-buttons">
+              <button class="${getClass('teamA')}" disabled
+                data-match-id="${matchId}" data-prediction="teamA">
+                ${teamALabel}
+              </button>
+              <button class="${getClass('draw')}" disabled
+                data-match-id="${matchId}" data-prediction="draw">
+                ${drawLabel}
+              </button>
+              <button class="${getClass('teamB')}" disabled
+                data-match-id="${matchId}" data-prediction="teamB">
+                ${teamBLabel}
+              </button>
+            </div>
+            ${statusHtml}
+          </div>
+        `;
       }
 
       return `
         <div class="bet-section">
-          <div class="bet-buttons">
-            <button class="${getClass('teamA')}" ${buttonsDisabled}
-              data-match-id="${escapeHtml(match.id)}" data-prediction="teamA">
-              ${teamALabel}
-            </button>
-            <button class="${getClass('draw')}" ${buttonsDisabled}
-              data-match-id="${escapeHtml(match.id)}" data-prediction="draw">
-              ${drawLabel}
-            </button>
-            <button class="${getClass('teamB')}" ${buttonsDisabled}
-              data-match-id="${escapeHtml(match.id)}" data-prediction="teamB">
-              ${teamBLabel}
+          <div class="bet-type-tabs" data-match-id="${matchId}">
+            <button class="bet-type-tab ${currentBetType === 'simple' ? 'active' : ''}"
+              data-tab="simple" data-match-id="${matchId}">🎯 Résultat simple <span class="pts-badge">+1 pt</span></button>
+            <button class="bet-type-tab ${currentBetType === 'exact' ? 'active' : ''}"
+              data-tab="exact" data-match-id="${matchId}">⚽ Score exact <span class="pts-badge pts-exact">+3 pts</span></button>
+          </div>
+          <div class="bet-panel bet-panel-simple ${currentBetType === 'simple' ? 'active' : ''}">
+            <div class="bet-buttons">
+              <button class="${getClass('teamA')}"
+                data-match-id="${matchId}" data-prediction="teamA">
+                ${teamALabel}
+              </button>
+              <button class="${getClass('draw')}"
+                data-match-id="${matchId}" data-prediction="draw">
+                ${drawLabel}
+              </button>
+              <button class="${getClass('teamB')}"
+                data-match-id="${matchId}" data-prediction="teamB">
+                ${teamBLabel}
+              </button>
+            </div>
+          </div>
+          <div class="bet-panel bet-panel-exact ${currentBetType === 'exact' ? 'active' : ''}">
+            <div class="exact-score-row">
+              <div class="exact-score-team">
+                <span class="exact-team-flag">${match.flagA}</span>
+                <span class="exact-team-name">${escapeHtml(match.teamA)}</span>
+                <input type="number" class="score-input" min="0" max="99"
+                  id="scoreA-${matchId}" value="${savedScoreA}"
+                  placeholder="0" aria-label="Score ${escapeHtml(match.teamA)}" />
+              </div>
+              <span class="exact-separator">–</span>
+              <div class="exact-score-team">
+                <span class="exact-team-flag">${match.flagB}</span>
+                <span class="exact-team-name">${escapeHtml(match.teamB)}</span>
+                <input type="number" class="score-input" min="0" max="99"
+                  id="scoreB-${matchId}" value="${savedScoreB}"
+                  placeholder="0" aria-label="Score ${escapeHtml(match.teamB)}" />
+              </div>
+            </div>
+            <button class="btn btn-primary btn-exact-submit" data-match-id="${matchId}">
+              Valider le score exact
             </button>
           </div>
           ${statusHtml}
@@ -342,16 +431,76 @@
     }
 
     /**
-     * Handle a bet button click.
+     * Handle a bet type tab click (switch between simple and exact modes).
+     * @param {HTMLElement} tab - The clicked tab button
+     */
+    function handleBetTypeTabClick(tab) {
+      const matchId = tab.dataset.matchId;
+      const tabType = tab.dataset.tab;
+
+      const section = tab.closest('.bet-section');
+      if (!section) return;
+
+      // Update active tab
+      section.querySelectorAll('.bet-type-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Show/hide panels
+      section.querySelectorAll('.bet-panel').forEach(p => p.classList.remove('active'));
+      section.querySelector(`.bet-panel-${tabType}`).classList.add('active');
+
+      // If switching to simple and user currently has an exact bet, keep it visible but allow changing
+    }
+
+    /**
+     * Handle exact score form submission.
+     * @param {HTMLElement} btn - The submit button
+     */
+    function handleExactScoreSubmit(btn) {
+      const matchId = btn.dataset.matchId;
+      const section = btn.closest('.bet-section');
+
+      const inputA = section.querySelector(`#scoreA-${matchId}`);
+      const inputB = section.querySelector(`#scoreB-${matchId}`);
+
+      const rawA = inputA ? inputA.value.trim() : '';
+      const rawB = inputB ? inputB.value.trim() : '';
+
+      if (rawA === '' || rawB === '') {
+        showToast('Entre les deux scores avant de valider.', 'error');
+        return;
+      }
+
+      const scoreA = parseInt(rawA, 10);
+      const scoreB = parseInt(rawB, 10);
+
+      if (isNaN(scoreA) || isNaN(scoreB) || scoreA < 0 || scoreB < 0) {
+        showToast('Les scores doivent être des nombres positifs.', 'error');
+        return;
+      }
+
+      const result = placeBet(currentUser.id, matchId, null, scoreA, scoreB);
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+
+      allBets = getBets();
+      showToast('Score exact enregistré ! ⚽', 'success');
+      renderMatches();
+    }
+
+    /**
+     * Handle a bet button click (simple bet).
      * @param {HTMLElement} btn - The clicked bet button
      */
     function handleBetClick(btn) {
       const matchId = btn.dataset.matchId;
       const prediction = btn.dataset.prediction;
 
-      // If the user clicks the already-selected button, deselect it
+      // If the user clicks the already-selected button (simple bet), deselect it
       const existingBet = getUserBet(currentUser.id, matchId);
-      if (existingBet && existingBet.prediction === prediction) {
+      if (existingBet && existingBet.betType !== 'exact' && existingBet.prediction === prediction) {
         const result = removeBet(currentUser.id, matchId);
         if (!result.success) {
           showToast(result.error, 'error');
