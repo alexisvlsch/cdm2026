@@ -677,8 +677,9 @@ function recalculateMatch(matchId) {
 }
 
 /**
- * Recalculate all users' points from scratch based on all correct bets.
- * Exact score bets award 3 points; correct-outcome-only bets award 1 point.
+ * Recalculate all users' points from scratch based on all bets.
+ * Simple correct bets award 2 points.
+ * Exact score bets award 5 points, or 1 point if only the winner/draw is correct.
  */
 function recalculateAllPoints() {
   const users = getUsers();
@@ -687,10 +688,14 @@ function recalculateAllPoints() {
   const pointsMap = new Map(users.map(u => [u.id, 0]));
   for (const bet of bets) {
     if (!pointsMap.has(bet.userId)) continue;
-    if (bet.isExactScore === true) {
-      pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 3);
+    if (bet.betType === 'exact') {
+      if (bet.isExactScore === true) {
+        pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 5);
+      } else if (bet.isCorrect === true) {
+        pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 1);
+      }
     } else if (bet.isCorrect === true) {
-      pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 1);
+      pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 2);
     }
   }
 

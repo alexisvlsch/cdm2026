@@ -312,7 +312,7 @@
       if (hasResult && userBet) {
         if (userBet.betType === 'exact') {
           if (userBet.isExactScore === true) {
-            statusHtml = `<div class="bet-status correct">🎯 Score exact ! <span class="result-badge correct">+3 pts 🌟</span></div>`;
+            statusHtml = `<div class="bet-status correct">🎯 Score exact ! <span class="result-badge correct">+5 pts 🌟</span></div>`;
           } else if (userBet.isCorrect === true) {
             statusHtml = `<div class="bet-status correct">✅ Bonne équipe ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
           } else {
@@ -321,7 +321,7 @@
         } else {
           const isCorrect = userBet.prediction === match.result;
           if (isCorrect) {
-            statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
+            statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+2 pts 🎉</span></div>`;
           } else {
             statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
           }
@@ -379,9 +379,9 @@
         <div class="bet-section">
           <div class="bet-type-tabs" data-match-id="${matchId}">
             <button class="bet-type-tab ${currentBetType === 'simple' ? 'active' : ''}"
-              data-tab="simple" data-match-id="${matchId}">🎯 Résultat simple <span class="pts-badge">+1 pt</span></button>
+              data-tab="simple" data-match-id="${matchId}">🎯 Résultat simple <span class="pts-badge">+2 pts</span></button>
             <button class="bet-type-tab ${currentBetType === 'exact' ? 'active' : ''}"
-              data-tab="exact" data-match-id="${matchId}">⚽ Score exact <span class="pts-badge pts-exact">+3 pts</span></button>
+              data-tab="exact" data-match-id="${matchId}">⚽ Score exact <span class="pts-badge pts-exact">+5 pts</span></button>
           </div>
           <div class="bet-panel bet-panel-simple ${currentBetType === 'simple' ? 'active' : ''}">
             <div class="bet-buttons">
