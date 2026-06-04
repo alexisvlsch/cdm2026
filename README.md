@@ -3,7 +3,7 @@
 **La plateforme de pronostics entre amis pour la Coupe du Monde 2026 !**
 
 Une web app statique hébergée sur GitHub Pages.
-Pas d'argent — uniquement un système de points (1 point par bon pronostic).
+Pas d'argent — uniquement un système de points (2 pts pronostic simple correct, 5 pts score exact, 1 pt si vainqueur correct sans score exact).
 Avec support optionnel de **Firebase Firestore** pour une base de données partagée (tous les utilisateurs voient les stats de tout le monde).
 
 ---
