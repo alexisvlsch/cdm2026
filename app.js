@@ -141,6 +141,9 @@ const KEYS = {
 };
 
 const BET_DEADLINE_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+const PROFILE_AVATARS = ['🙂', '😀', '😎', '🧕', '👩', '👨', '👵', '👴', '🧑🏾', '🧑🏻', '🧑🏽', '🧑🏿'];
+const DEFAULT_AVATAR = PROFILE_AVATARS[0];
+const MAX_PROFILE_DESCRIPTION_LENGTH = 180;
 
 // === STORAGE HELPERS ===
 
@@ -345,7 +348,7 @@ function getBasePath() {
  * @returns {Object|null} Current user object or null
  */
 function getCurrentUser() {
-  return storageGet(KEYS.CURRENT_USER, null);
+  return normalizeUser(storageGet(KEYS.CURRENT_USER, null));
 }
 
 /**
@@ -353,7 +356,7 @@ function getCurrentUser() {
  * @param {Object} user - User object to set as current
  */
 function setCurrentUser(user) {
-  storageSet(KEYS.CURRENT_USER, user);
+  storageSet(KEYS.CURRENT_USER, normalizeUser(user));
 }
 
 /**
@@ -368,7 +371,8 @@ function logout() {
  * @returns {Array} Array of user objects
  */
 function getUsers() {
-  return storageGet(KEYS.USERS, []);
+  const users = storageGet(KEYS.USERS, []);
+  return users.map(normalizeUser).filter(Boolean);
 }
 
 /**
@@ -376,7 +380,48 @@ function getUsers() {
  * @param {Array} users - Updated users array
  */
 function saveUsers(users) {
-  storageSet(KEYS.USERS, users);
+  storageSet(KEYS.USERS, users.map(normalizeUser).filter(Boolean));
+}
+
+/**
+ * Normalize an avatar value; fallback to default avatar.
+ * @param {*} avatar
+ * @returns {string}
+ */
+function normalizeAvatar(avatar) {
+  return PROFILE_AVATARS.includes(avatar) ? avatar : DEFAULT_AVATAR;
+}
+
+/**
+ * Normalize the profile description.
+ * @param {*} description
+ * @returns {string}
+ */
+function normalizeDescription(description) {
+  if (typeof description !== 'string') return '';
+  return description.trim().slice(0, MAX_PROFILE_DESCRIPTION_LENGTH);
+}
+
+/**
+ * Normalize a user object to ensure profile fields exist.
+ * @param {*} user
+ * @returns {Object|null}
+ */
+function normalizeUser(user) {
+  if (!user || typeof user !== 'object') return null;
+  return {
+    ...user,
+    avatar: normalizeAvatar(user.avatar),
+    description: normalizeDescription(user.description),
+  };
+}
+
+/**
+ * Return the list of allowed profile avatars.
+ * @returns {Array<string>}
+ */
+function getProfileAvatars() {
+  return [...PROFILE_AVATARS];
 }
 
 /**
@@ -405,6 +450,8 @@ function createUser(username) {
   const user = {
     id: generateUUID(),
     username: trimmed,
+    avatar: DEFAULT_AVATAR,
+    description: '',
     points: 0,
     createdAt: new Date().toISOString(),
   };
@@ -414,6 +461,45 @@ function createUser(username) {
   // Persist to Firestore if available
   fbSaveUser(user);
   return { success: true, user };
+}
+
+/**
+ * Update avatar and description for a user.
+ * @param {string} userId
+ * @param {{avatar?: string, description?: string}} profile
+ * @returns {{success: boolean, user?: Object, error?: string}}
+ */
+function updateUserProfile(userId, profile) {
+  const users = getUsers();
+  const index = users.findIndex(u => u.id === userId);
+  if (index === -1) {
+    return { success: false, error: 'Utilisateur introuvable.' };
+  }
+
+  if (profile.avatar !== undefined && !PROFILE_AVATARS.includes(profile.avatar)) {
+    return { success: false, error: 'Avatar invalide.' };
+  }
+
+  if (profile.description !== undefined && typeof profile.description !== 'string') {
+    return { success: false, error: 'Description invalide.' };
+  }
+
+  const updatedUser = normalizeUser({
+    ...users[index],
+    avatar: profile.avatar !== undefined ? profile.avatar : users[index].avatar,
+    description: profile.description !== undefined ? profile.description : users[index].description,
+  });
+
+  users[index] = updatedUser;
+  saveUsers(users);
+  fbSaveUser(updatedUser);
+
+  const currentUser = getCurrentUser();
+  if (currentUser && currentUser.id === updatedUser.id) {
+    setCurrentUser(updatedUser);
+  }
+
+  return { success: true, user: updatedUser };
 }
 
 // === BET HELPERS ===
@@ -824,7 +910,7 @@ function requireAuth() {
 
 /**
  * Render the top navigation bar in the #navbar element.
- * @param {string} activePage - 'bets' or 'stats'
+ * @param {string} activePage - 'bets', 'stats' or 'profile'
  */
 function renderNavbar(activePage) {
   const user = getCurrentUser();
@@ -839,9 +925,10 @@ function renderNavbar(activePage) {
       <nav class="nav-links" id="nav-links">
         <a href="${base}bets.html" class="${activePage === 'bets' ? 'active' : ''}">🏟️ Matchs</a>
         <a href="${base}stats.html" class="${activePage === 'stats' ? 'active' : ''}">🏆 Classement</a>
+        <a href="${base}profile.html" class="${activePage === 'profile' ? 'active' : ''}">👤 Mon profil</a>
       </nav>
       <div class="nav-user" id="nav-user-menu">
-        <span class="nav-username">👤 ${escapeHtml(user.username)}</span>
+        <span class="nav-username">${escapeHtml(user.avatar)} ${escapeHtml(user.username)}</span>
         <button class="btn btn-sm btn-outline" id="logout-btn">Déconnexion</button>
       </div>
     </div>
