@@ -141,7 +141,11 @@ const KEYS = {
 };
 
 const BET_DEADLINE_MS = 60 * 60 * 1000; // 1 hour in milliseconds
-const PROFILE_AVATARS = ['🙂', '😀', '😎', '🧕', '👩', '👨', '👵', '👴', '🧑🏾', '🧑🏻', '🧑🏽', '🧑🏿'];
+const PROFILE_AVATARS = [
+  '🙂', '😀', '😎', '🤠', '🥳', '🤓', '🧢', '🧕',
+  '👩', '👨', '👵', '👴', '🧑🏻', '🧑🏽', '🧑🏾', '🧑🏿',
+  '🧙', '🧑‍🚀', '🦸', '🕺', '🐼', '🦊', '🦁', '🐸'
+];
 const DEFAULT_AVATAR = PROFILE_AVATARS[0];
 const MAX_PROFILE_DESCRIPTION_LENGTH = 180;
 

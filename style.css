@@ -918,8 +918,13 @@ input {
   flex: 1;
 }
 
+.podium-rank-emoji {
+  font-size: 1.2rem;
+  margin-bottom: 4px;
+}
+
 .podium-avatar {
-  font-size: 1.5rem;
+  font-size: 2rem;
   margin-bottom: 6px;
 }
 
@@ -1078,6 +1083,59 @@ input {
 .leaderboard-table tr.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.leaderboard-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leaderboard-user-avatar {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.leaderboard-user-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.user-profile-chip {
+  position: relative;
+  cursor: help;
+}
+
+.user-profile-info {
+  font-size: 0.7rem;
+  opacity: 0.65;
+}
+
+.user-profile-chip:hover .user-profile-info {
+  opacity: 1;
+}
+
+.user-profile-chip:hover::after {
+  content: attr(data-description);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 20;
+  background: rgba(15, 15, 22, 0.96);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 0, 0.45);
+  width: max-content;
+  max-width: 240px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  white-space: normal;
 }
 
 .rank-badge {
