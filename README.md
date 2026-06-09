@@ -79,6 +79,7 @@ Les scripts doivent être inclus dans cet ordre exact (déjà configuré dans le
 ├── index.html                 ← Page de connexion / inscription
 ├── bets.html                  ← Liste des matchs + formulaire de paris
 ├── stats.html                 ← Classement et statistiques
+├── profile.html               ← Onglet Mon profil (avatar + description)
 ├── style.css                  ← Feuille de style globale
 ├── app.js                     ← Logique JS partagée (+ intégration Firebase)
 ├── firebase-config.example.js ← Exemple de config Firebase (à copier)
@@ -182,6 +183,11 @@ window.__FIREBASE_CONFIG__ = {
 ### Classement & stats globales
 - Va sur la page **Classement** (`stats.html`) pour voir le podium et le tableau général.
 - Avec Firebase activé, **tous les utilisateurs** sont visibles dans le classement.
+
+### Mon profil
+- Va sur l'onglet **Mon profil** (`profile.html`) depuis la barre de navigation.
+- Choisis un avatar proposé (représentatif de profils variés) et ajoute une courte description personnelle.
+- Les infos sont sauvegardées en localStorage ou dans Firestore (si Firebase est activé).
 
 ---
 
