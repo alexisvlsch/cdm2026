@@ -149,11 +149,13 @@
         const placeNum = numbers[i];
         const emoji = emojis[i];
         const isCurrent = entry.user.id === currentUser.id;
+        const profileDescription = getProfileDescription(entry.user);
         return `
           <div class="podium-place">
-            <div class="podium-avatar">${emoji}</div>
-            <div class="podium-username" style="${isCurrent ? 'color:#FFD700;' : ''}">
-              ${escapeHtml(entry.user.username)}${isCurrent ? ' 👈' : ''}
+            <div class="podium-rank-emoji">${emoji}</div>
+            <div class="podium-avatar">${escapeHtml(entry.user.avatar)}</div>
+            <div class="podium-username user-profile-chip" data-description="${escapeHtml(profileDescription)}" style="${isCurrent ? 'color:#FFD700;' : ''}">
+              ${escapeHtml(entry.user.username)}${isCurrent ? ' 👈' : ''} <span class="user-profile-info">ℹ️</span>
             </div>
             <div class="podium-points">${entry.points} pt${entry.points > 1 ? 's' : ''}</div>
             <div class="podium-block">${placeNum}</div>
@@ -226,6 +228,16 @@
     }
 
     /**
+     * Return a user profile description suitable for hover display.
+     * @param {Object} user
+     * @returns {string}
+     */
+    function getProfileDescription(user) {
+      const description = typeof user.description === 'string' ? user.description.trim() : '';
+      return description || 'Aucune description pour le moment.';
+    }
+
+    /**
      * Render the full leaderboard table with staggered animation.
      */
     function renderLeaderboard() {
@@ -241,6 +253,7 @@
       tbody.innerHTML = leaderboard.map((entry, index) => {
         const rank = index + 1;
         const isCurrent = entry.user.id === currentUser.id;
+        const profileDescription = getProfileDescription(entry.user);
         const badgeClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
         const rankDisplay = rank <= 3
           ? `<span class="rank-badge ${badgeClass}">${rank}</span>`
@@ -250,8 +263,14 @@
           <tr class="${isCurrent ? 'current-user' : ''}" style="transition-delay:${index * 50}ms">
             <td>${rankDisplay}</td>
             <td>
-              ${escapeHtml(entry.user.username)}
-              ${isCurrent ? ' <span style="color:var(--color-gold);font-size:0.75rem;">◀ toi</span>' : ''}
+              <div class="leaderboard-user user-profile-chip" data-description="${escapeHtml(profileDescription)}">
+                <span class="leaderboard-user-avatar">${escapeHtml(entry.user.avatar)}</span>
+                <span class="leaderboard-user-name">
+                  ${escapeHtml(entry.user.username)}
+                  ${isCurrent ? ' <span style="color:var(--color-gold);font-size:0.75rem;">◀ toi</span>' : ''}
+                </span>
+                <span class="user-profile-info">ℹ️</span>
+              </div>
             </td>
             <td>${entry.correctBets}</td>
             <td>${entry.totalBets}</td>
