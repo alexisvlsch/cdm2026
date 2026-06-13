@@ -31,11 +31,16 @@
     <!-- Leaderboard table -->
     <section class="leaderboard-section" aria-label="Classement général">
       <h3 class="leaderboard-title">🥇 Classement général</h3>
+      <div class="leaderboard-controls">
+        <button type="button" class="btn btn-sm btn-outline admin-toggle-btn" id="admin-toggle-btn" aria-controls="admin-panel" aria-expanded="false">
+          🔐 Ouvrir admin
+        </button>
+      </div>
       <div style="overflow-x:auto;">
         <table class="leaderboard-table" id="leaderboard-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th>🏅 Rang</th>
               <th>👤 Joueur</th>
               <th>✅ Bons pronostics</th>
               <th>📊 Total paris</th>
@@ -48,11 +53,11 @@
       </div>
     </section>
 
-      <!-- Admin panel (hidden, toggle with Shift+A) -->
+      <!-- Admin panel (hidden, toggle with Shift+A or Admin button) -->
     <section class="admin-panel" id="admin-panel" aria-label="Panneau administrateur">
       <h3 class="admin-title">
         <i class="fas fa-lock"></i> Panneau Admin
-        <small style="font-size:0.7rem;opacity:0.6;">(Shift+A pour fermer)</small>
+        <small style="font-size:0.7rem;opacity:0.6;">(Shift+A ou bouton Admin)</small>
       </h3>
       <div class="admin-form">
         <div>
@@ -294,10 +299,11 @@
     }
 
     /**
-     * Set up the hidden admin panel (Shift+A to toggle).
+     * Set up the hidden admin panel (Shift+A or button to toggle).
      */
     function setupAdminPanel() {
       const panel = document.getElementById('admin-panel');
+      const toggleBtn = document.getElementById('admin-toggle-btn');
       const matchSelect = document.getElementById('admin-match-select');
       const submitBtn = document.getElementById('admin-submit-btn');
       const resetBtn = document.getElementById('admin-reset-btn');
@@ -307,6 +313,20 @@
       const derivedResultEl = document.getElementById('admin-derived-result');
       const teamALabel = document.getElementById('admin-team-a-label');
       const teamBLabel = document.getElementById('admin-team-b-label');
+
+      function syncAdminToggleState() {
+        const isVisible = panel.classList.contains('visible');
+        toggleBtn.setAttribute('aria-expanded', String(isVisible));
+        toggleBtn.textContent = isVisible ? '🔒 Fermer admin' : '🔐 Ouvrir admin';
+      }
+
+      function toggleAdminPanel() {
+        panel.classList.toggle('visible');
+        syncAdminToggleState();
+      }
+
+      toggleBtn.addEventListener('click', toggleAdminPanel);
+      syncAdminToggleState();
 
       // Populate match dropdown
       const matches = getMatches();
@@ -369,7 +389,7 @@
       // Toggle panel with Shift+A
       document.addEventListener('keydown', e => {
         if (e.shiftKey && e.key === 'A') {
-          panel.classList.toggle('visible');
+          toggleAdminPanel();
         }
       });
 

@@ -228,7 +228,10 @@ cp data/fixtures.json data/matches.json
 C'est la méthode à utiliser **au fil des matchs**, sans toucher au code.
 
 1. Va sur la page **Classement** (`stats.html`).
-2. Appuie sur **Shift+A** (maintiens Maj et appuie sur A) — un panneau admin caché apparaît en bas de la page. Rappuie sur **Shift+A** pour le fermer.
+2. Ouvre le panneau admin :
+   - **Ordinateur** : appuie sur **Shift+A** (maintiens Maj et appuie sur A)
+   - **Mobile** : utilise le bouton **🔐 Ouvrir admin** au-dessus du tableau de classement
+   - Utilise ensuite **Shift+A** ou le bouton **🔒 Fermer admin** pour le refermer.
 3. Dans le menu déroulant **"Sélectionner un match"**, choisis le match dont tu veux entrer le résultat. Les matchs déjà renseignés sont marqués d'un **✓**.
 4. Dans le menu **"Résultat"**, sélectionne :
    - **Équipe A gagne** — l'équipe listée à gauche a gagné
