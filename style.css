@@ -1039,6 +1039,17 @@ input {
   border-bottom: 3px solid var(--color-gold);
 }
 
+.leaderboard-controls {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 20px;
+  background: var(--color-bg-medium);
+}
+
+.admin-toggle-btn {
+  border-color: rgba(255,255,255,0.5);
+}
+
 .leaderboard-table {
   width: 100%;
   border-collapse: collapse;
@@ -1447,6 +1458,14 @@ input {
 
   .podium {
     max-width: 280px;
+  }
+
+  .leaderboard-controls {
+    justify-content: stretch;
+  }
+
+  .admin-toggle-btn {
+    width: 100%;
   }
 
   .filter-row {
