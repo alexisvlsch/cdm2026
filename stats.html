@@ -42,9 +42,9 @@
             <tr>
               <th>🏅 Rang</th>
               <th>👤 Joueur</th>
-              <th>✅ Bons pronostics</th>
-              <th>📊 Total paris</th>
-              <th>🎯 Réussite</th>
+              <th title="Nombre de pronostics corrects parmi les matchs déjà joués">✅ Bons pronos</th>
+              <th title="Matchs joués / Paris placés au total (y compris les matchs à venir)">📊 Joués / Total</th>
+              <th title="Taux de réussite calculé uniquement sur les matchs déjà joués">🎯 Réussite</th>
               <th>⭐ Points</th>
             </tr>
           </thead>
@@ -190,8 +190,8 @@
           <span class="stat-label">⭐ Points</span>
         </div>
         <div class="stat-item">
-          <span class="stat-value">${entry.totalBets}</span>
-          <span class="stat-label">🎲 Paris placés</span>
+          <span class="stat-value">${entry.playedBets} / ${entry.totalBets}</span>
+          <span class="stat-label">🎲 Joués / Total</span>
         </div>
         <div class="stat-item">
           <span class="stat-value">${entry.correctBets}</span>
@@ -199,7 +199,7 @@
         </div>
         <div class="stat-item">
           <span class="stat-value">${entry.successRate}%</span>
-          <span class="stat-label">🎯 Réussite</span>
+          <span class="stat-label">🎯 Réussite (joués)</span>
         </div>
         <div class="stat-item">
           <span class="stat-value">${entry.streak}</span>
@@ -278,7 +278,7 @@
               </div>
             </td>
             <td>${entry.correctBets}</td>
-            <td>${entry.totalBets}</td>
+            <td style="font-size:0.85rem;">${entry.playedBets} / ${entry.totalBets}</td>
             <td>
               <div class="success-rate-bar">
                 <div class="rate-bar"><div class="rate-fill" style="width:${entry.successRate}%"></div></div>

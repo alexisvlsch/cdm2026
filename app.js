@@ -66,11 +66,14 @@ function fbSaveUser(user) {
 
 /**
  * Save a bet document to Firestore (fire-and-forget).
+ * Uses a compound key (userId_matchId) to guarantee at most one document
+ * per user/match and prevent duplicates in multi-device/offline scenarios.
  * @param {Object} bet - Bet object to persist
  */
 function fbSaveBet(bet) {
   if (!db) return;
-  db.collection('bets').doc(bet.id).set(bet)
+  const docId = `${bet.userId}_${bet.matchId}`;
+  db.collection('bets').doc(docId).set(bet)
     .catch(e => debugLog('Firestore: save bet failed', e));
 }
 
@@ -90,23 +93,33 @@ function fbSaveMatchResult(match) {
 
 /**
  * Delete a bet document from Firestore (fire-and-forget).
- * @param {string} betId - ID of the bet to delete
+ * Deletes using the compound key (userId_matchId) and also attempts to
+ * remove any legacy UUID-keyed document to clean up old data.
+ * @param {Object} bet - Bet object to delete
  */
-function fbDeleteBet(betId) {
+function fbDeleteBet(bet) {
   if (!db) return;
-  db.collection('bets').doc(betId).delete()
-    .catch(e => debugLog('Firestore: delete bet failed', e));
+  const compoundId = `${bet.userId}_${bet.matchId}`;
+  db.collection('bets').doc(compoundId).delete()
+    .catch(e => debugLog('Firestore: delete bet (compound key) failed', e));
+  // Also remove legacy document keyed by UUID if it exists
+  if (bet.id && bet.id !== compoundId) {
+    db.collection('bets').doc(bet.id).delete()
+      .catch(() => { /* silently ignore – may not exist */ });
+  }
 }
 
 /**
  * Batch-update multiple bet documents in Firestore (fire-and-forget).
+ * Uses compound keys (userId_matchId) consistent with fbSaveBet.
  * @param {Array} bets - Array of bet objects to update
  */
 function fbSaveBets(bets) {
   if (!db || bets.length === 0) return;
   const batch = db.batch();
   for (const bet of bets) {
-    batch.set(db.collection('bets').doc(bet.id), bet);
+    const docId = `${bet.userId}_${bet.matchId}`;
+    batch.set(db.collection('bets').doc(docId), bet);
   }
   batch.commit().catch(e => debugLog('Firestore: batch save bets failed', e));
 }
@@ -257,6 +270,17 @@ async function loadAllData() {
       users = usersSnap.docs.map(d => d.data());
       bets = betsSnap.docs.map(d => d.data());
 
+      // Deduplicate bets: keep only one bet per user/match (latest by placedAt)
+      const betKeyMap = new Map();
+      for (const bet of bets) {
+        const key = `${bet.userId}_${bet.matchId}`;
+        const existing = betKeyMap.get(key);
+        if (!existing || (bet.placedAt || '') > (existing.placedAt || '')) {
+          betKeyMap.set(key, bet);
+        }
+      }
+      bets = Array.from(betKeyMap.values());
+
       // If the currently logged-in user was deleted from Firestore, log them out.
       const currentUser = storageGet(KEYS.CURRENT_USER, null);
       const userIds = new Set(users.map(u => u.id));
@@ -303,7 +327,8 @@ async function loadAllData() {
 /**
  * Fetch fixtures from the server. Remote metadata (teams, dates, venue, stage)
  * always takes precedence over localStorage to reflect any official schedule
- * corrections. Only the `result` field from localStorage is preserved (admin updates).
+ * corrections. The `result`, `resultScoreA` and `resultScoreB` fields from
+ * localStorage are preserved (admin updates).
  * @param {string} url - URL of the fixtures JSON file
  * @returns {Promise<Array>} Array of match objects
  */
@@ -315,16 +340,24 @@ async function fetchAndMergeFixtures(url) {
     const remoteData = await response.json();
     if (!Array.isArray(remoteData)) throw new Error('Not an array');
 
-    // Build a result map from localStorage (preserves admin-set results)
+    // Build a result map from localStorage (preserves admin-set results AND scores)
     const resultMap = localData
-      ? new Map(localData.map(m => [m.id, m.result]))
+      ? new Map(localData.map(m => [m.id, {
+          result: m.result,
+          resultScoreA: m.resultScoreA,
+          resultScoreB: m.resultScoreB,
+        }]))
       : new Map();
 
-    // Remote metadata wins; only re-apply preserved results
-    const merged = remoteData.map(m => ({
-      ...m,
-      result: resultMap.has(m.id) ? resultMap.get(m.id) : m.result,
-    }));
+    // Remote metadata wins; re-apply preserved result + scores
+    const merged = remoteData.map(m => {
+      const saved = resultMap.get(m.id);
+      if (!saved) return { ...m };
+      const out = { ...m, result: saved.result };
+      if (saved.resultScoreA != null) out.resultScoreA = saved.resultScoreA;
+      if (saved.resultScoreB != null) out.resultScoreB = saved.resultScoreB;
+      return out;
+    });
 
     storageSet(KEYS.MATCHES, merged);
     return merged;
@@ -614,10 +647,10 @@ function removeBet(userId, matchId) {
   const existing = bets.findIndex(b => b.userId === userId && b.matchId === matchId);
   if (existing < 0) return { success: true };
 
-  const betId = bets[existing].id;
+  const removedBet = bets[existing];
   bets.splice(existing, 1);
   saveBets(bets);
-  fbDeleteBet(betId);
+  fbDeleteBet(removedBet);
   return { success: true };
 }
 
@@ -799,7 +832,7 @@ function recalculateAllPoints() {
 
 /**
  * Compute leaderboard stats for each user.
- * @returns {Array} Array of {user, totalBets, correctBets, successRate, points, streak}
+ * @returns {Array} Array of {user, totalBets, playedBets, correctBets, successRate, points, streak}
  */
 function computeLeaderboard() {
   const users = getUsers();
@@ -809,10 +842,13 @@ function computeLeaderboard() {
   return users.map(user => {
     const userBets = bets.filter(b => b.userId === user.id);
     const totalBets = userBets.length;
+    // Only count bets whose match has a result (isCorrect is not null)
+    const playedBets = userBets.filter(b => b.isCorrect !== null).length;
     const correctBets = userBets.filter(b => b.isCorrect === true).length;
-    const successRate = totalBets > 0 ? Math.round((correctBets / totalBets) * 100) : 0;
+    // Success rate is calculated on played matches only, not on future bets
+    const successRate = playedBets > 0 ? Math.round((correctBets / playedBets) * 100) : 0;
     const streak = computeStreak(userBets, matches);
-    return { user, totalBets, correctBets, successRate, points: user.points, streak };
+    return { user, totalBets, playedBets, correctBets, successRate, points: user.points, streak };
   }).sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     return b.successRate - a.successRate;
