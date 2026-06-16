@@ -246,7 +246,7 @@
     function renderMatchCard(match) {
       const locked = isBetLocked(match);
       const userBet = getUserBet(currentUser.id, match.id);
-      const hasResult = match.result !== null;
+      const hasResult = match.result != null;
 
       const betSectionHtml = renderBetSection(match, locked, userBet, hasResult);
 
@@ -311,9 +311,11 @@
 
       if (hasResult && userBet) {
         if (userBet.betType === 'exact') {
-          if (userBet.isExactScore === true) {
+          const localIsCorrect = userBet.prediction === match.result;
+          const localIsExactScore = localIsCorrect && match.resultScoreA != null && match.resultScoreB != null && userBet.scoreA === match.resultScoreA && userBet.scoreB === match.resultScoreB;
+          if (localIsExactScore) {
             statusHtml = `<div class="bet-status correct">🎯 Score exact ! <span class="result-badge correct">+5 pts 🌟</span></div>`;
-          } else if (userBet.isCorrect === true) {
+          } else if (localIsCorrect) {
             statusHtml = `<div class="bet-status correct">✅ Bonne équipe ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
           } else {
             statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;

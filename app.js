@@ -353,7 +353,7 @@ async function fetchAndMergeFixtures(url) {
     const merged = remoteData.map(m => {
       const saved = resultMap.get(m.id);
       if (!saved) return { ...m };
-      const out = { ...m, result: saved.result };
+      const out = { ...m, result: saved.result ?? null };
       if (saved.resultScoreA != null) out.resultScoreA = saved.resultScoreA;
       if (saved.resultScoreB != null) out.resultScoreB = saved.resultScoreB;
       return out;
@@ -772,7 +772,7 @@ function resetMatchResult(matchId) {
 function recalculateMatch(matchId) {
   const matches = getMatches();
   const match = matches.find(m => m.id === matchId);
-  if (!match || match.result === null) return 0;
+  if (!match || match.result == null) return 0;
 
   const hasScore = match.resultScoreA != null && match.resultScoreB != null;
   const bets = getBets();
