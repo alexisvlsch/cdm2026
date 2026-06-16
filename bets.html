@@ -293,12 +293,18 @@
 
       const getClass = (prediction) => {
         let cls = 'bet-btn';
+        // Pour un pari exact, on derive la prediction implicite depuis le score
+        const exactPrediction = (userBet && userBet.betType === 'exact')
+          ? (userBet.scoreA > userBet.scoreB ? 'teamA' : userBet.scoreA < userBet.scoreB ? 'teamB' : 'draw')
+          : null;
+        const effectivePrediction = exactPrediction ?? (userBet ? userBet.prediction : null);
         if (!locked) {
+          // Panneau simple uniquement : on surligne le bouton selectionne
           if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' selected';
         } else {
           if (hasResult) {
             if (prediction === match.result) cls += ' correct';
-            else if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' wrong';
+            else if (userBet && effectivePrediction === prediction && effectivePrediction !== match.result) cls += ' wrong';
             else cls += ' faded';
           } else {
             if (userBet && userBet.betType !== 'exact' && userBet.prediction === prediction) cls += ' selected';
