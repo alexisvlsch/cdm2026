@@ -318,14 +318,14 @@
           } else if (localIsCorrect) {
             statusHtml = `<div class="bet-status correct">✅ Bonne équipe ! <span class="result-badge correct">+1 pt 🎉</span></div>`;
           } else {
-            statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+            statusHtml = `<div class="bet-status wrong">❌ Raté ! Tu avais parié : <strong>${getPredictionLabel(userBet, match)}</strong> · Résultat : <strong>${getResultLabel(match)}</strong></div>`;
           }
         } else {
           const isCorrect = userBet.prediction === match.result;
           if (isCorrect) {
             statusHtml = `<div class="bet-status correct">✅ Bonne réponse ! <span class="result-badge correct">+2 pts 🎉</span></div>`;
           } else {
-            statusHtml = `<div class="bet-status wrong">❌ Raté ! La bonne réponse était : <strong>${getResultLabel(match)}</strong></div>`;
+            statusHtml = `<div class="bet-status wrong">❌ Raté ! Tu avais parié : <strong>${getPredictionLabel(userBet, match)}</strong> · Résultat : <strong>${getResultLabel(match)}</strong></div>`;
           }
         }
       } else if (hasResult && !userBet) {
@@ -444,6 +444,15 @@
     function getResultLabel(match) {
       if (match.result === 'teamA') return escapeHtml(match.teamA) + ' gagne';
       if (match.result === 'teamB') return escapeHtml(match.teamB) + ' gagne';
+      return 'Match nul';
+    }
+
+    function getPredictionLabel(userBet, match) {
+      if (userBet.betType === 'exact') {
+        return escapeHtml(match.teamA) + ' ' + userBet.scoreA + ' – ' + userBet.scoreB + ' ' + escapeHtml(match.teamB);
+      }
+      if (userBet.prediction === 'teamA') return escapeHtml(match.teamA) + ' gagne';
+      if (userBet.prediction === 'teamB') return escapeHtml(match.teamB) + ' gagne';
       return 'Match nul';
     }
 
