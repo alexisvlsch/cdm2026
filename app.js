@@ -804,6 +804,33 @@ function recalculateMatch(matchId) {
  * Simple correct bets award 2 points.
  * Exact score bets award 5 points, or 1 point if only the winner/draw is correct.
  */
+/**
+ * Recalculate isCorrect/isExactScore for every bet from scratch, then recount points.
+ * Use this to repair data after a bug or retroactive result change.
+ */
+function recalculateAllMatches() {
+  const matches = getMatches();
+  const bets = getBets();
+
+  for (const match of matches) {
+    if (match.result == null) continue;
+    const hasScore = match.resultScoreA != null && match.resultScoreB != null;
+    for (const bet of bets) {
+      if (bet.matchId !== match.id) continue;
+      bet.isCorrect = bet.prediction === match.result;
+      if (bet.betType === 'exact' && hasScore) {
+        bet.isExactScore = bet.scoreA === match.resultScoreA && bet.scoreB === match.resultScoreB;
+      } else {
+        bet.isExactScore = null;
+      }
+    }
+  }
+
+  saveBets(bets);
+  fbSaveBets(bets);
+  recalculateAllPoints();
+}
+
 function recalculateAllPoints() {
   const users = getUsers();
   const bets = getBets();
