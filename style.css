@@ -1085,7 +1085,12 @@ input {
   font-weight: 700;
 }
 
-.leaderboard-table tr {
+.leaderboard-table thead tr {
+  opacity: 1;
+  transform: none;
+}
+
+.leaderboard-table tbody tr {
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;
