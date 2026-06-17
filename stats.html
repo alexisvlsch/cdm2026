@@ -324,12 +324,46 @@
         toggleBtn.textContent = isVisible ? '🔒 Fermer admin' : '🔐 Ouvrir admin';
       }
 
-      function toggleAdminPanel() {
-        panel.classList.toggle('visible');
+      // SHA-256 du mot de passe admin (changer le hash pour changer le mot de passe)
+      const ADMIN_HASH = 'facdb5019fc58f1c28ff787d24015af4ea6656d0bb612703f431ce8d62a4f9ad';
+
+      async function sha256(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      async function openAdminPanel() {
+        if (sessionStorage.getItem('adminAuth') === '1') {
+          panel.classList.add('visible');
+          syncAdminToggleState();
+          return;
+        }
+        const pwd = prompt('🔐 Mot de passe admin :');
+        if (!pwd) return;
+        const hash = await sha256(pwd);
+        if (hash === ADMIN_HASH) {
+          sessionStorage.setItem('adminAuth', '1');
+          panel.classList.add('visible');
+          syncAdminToggleState();
+        } else {
+          alert('❌ Mot de passe incorrect.');
+        }
+      }
+
+      function closeAdminPanel() {
+        panel.classList.remove('visible');
         syncAdminToggleState();
       }
 
-      toggleBtn.addEventListener('click', toggleAdminPanel);
+      async function toggleAdminPanel() {
+        if (panel.classList.contains('visible')) {
+          closeAdminPanel();
+        } else {
+          await openAdminPanel();
+        }
+      }
+
+      toggleBtn.addEventListener('click', () => toggleAdminPanel());
 
       if (recalcAllBtn) {
         recalcAllBtn.addEventListener('click', () => {
@@ -409,6 +443,8 @@
           toggleAdminPanel();
         }
       });
+      // Hint discret dans la console pour les curieux
+      console.log('%c[Admin] Shift+A ou bouton Admin — mot de passe requis.', 'color:#00d4ff');
 
       // Validate and save result
       submitBtn.addEventListener('click', () => {
