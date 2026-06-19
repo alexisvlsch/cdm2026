@@ -107,7 +107,15 @@
             Matchs joués uniquement
           </label>
         </div>
-        <div id="admin-bets-detail" style="display:none;margin-top:14px;max-height:480px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;"></div>
+        <div id="admin-detail-legend" style="display:none;margin-top:10px;font-size:0.75rem;color:#aaa;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm);padding:8px 10px;line-height:1.6;">
+          <strong style="color:#ccc;">Légende :</strong>
+          🎯 <span style="color:#2ecc71;">Score exact</span> (+5 pts) ·
+          ✅ <span style="color:#2ecc71;">Bonne issue</span> (+1/+2 pts) ·
+          ❌ <span style="color:#e74c3c;">Pari faux</span> ·
+          — <span style="color:#777;">Match pas encore joué</span>
+          <br>Le trait fin entre chaque ligne sépare juste les paris des différents joueurs sur le même match — il n'a pas de sens particulier.
+        </div>
+        <div id="admin-bets-detail" style="display:none;margin-top:10px;max-height:480px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;"></div>
         <p style="color:#666;font-size:0.75rem;margin-top:8px;">
           💡 En production : exporter les données et commiter dans /data/
         </p>
@@ -329,6 +337,7 @@
       const detailFilters = document.getElementById('admin-detail-filters');
       const detailUserSelect = document.getElementById('admin-detail-user-select');
       const detailPlayedOnly = document.getElementById('admin-detail-played-only');
+      const detailLegend = document.getElementById('admin-detail-legend');
       const resultMsg = document.getElementById('admin-result-msg');
       const scoreAInput = document.getElementById('admin-score-a');
       const scoreBInput = document.getElementById('admin-score-b');
@@ -441,6 +450,9 @@
           return;
         }
 
+        const colHeader = '<div style="display:grid;grid-template-columns:1fr 1fr 90px;gap:8px;padding:4px 0 6px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.4px;color:#888;border-bottom:1px solid var(--color-border);">' +
+          '<span>Joueur</span><span>Pari</span><span style="text-align:right;">Statut</span></div>';
+
         const blocks = matchesWithBets.map(match => {
           let matchBets = bets.filter(b => b.matchId === match.id);
           if (userFilter) matchBets = matchBets.filter(b => b.userId === userFilter);
@@ -459,12 +471,14 @@
               : '(utilisateur supprime: ' + escapeHtml(bet.userId) + ')';
             let icon = '—';
             let color = '#777';
-            if (bet.isExactScore === true) { icon = '🎯'; color = '#2ecc71'; }
-            else if (bet.isCorrect === true) { icon = '✅'; color = '#2ecc71'; }
-            else if (bet.isCorrect === false) { icon = '❌'; color = '#e74c3c'; }
-            return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:0.82rem;border-top:1px solid rgba(255,255,255,0.05);">' +
+            let statusLabel = 'En attente';
+            if (bet.isExactScore === true) { icon = '🎯'; color = '#2ecc71'; statusLabel = 'Score exact'; }
+            else if (bet.isCorrect === true) { icon = '✅'; color = '#2ecc71'; statusLabel = 'Bonne issue'; }
+            else if (bet.isCorrect === false) { icon = '❌'; color = '#e74c3c'; statusLabel = 'Faux'; }
+            return '<div style="display:grid;grid-template-columns:1fr 1fr 90px;gap:8px;align-items:center;padding:5px 0;font-size:0.82rem;border-top:1px solid rgba(255,255,255,0.05);">' +
               '<span>' + name + '</span>' +
-              '<span style="color:' + color + ';">' + icon + ' ' + betLabel(bet, match) + '</span>' +
+              '<span style="color:#ccc;">' + betLabel(bet, match) + '</span>' +
+              '<span style="color:' + color + ';text-align:right;white-space:nowrap;">' + icon + ' ' + statusLabel + '</span>' +
               '</div>';
           }).join('');
 
@@ -473,6 +487,7 @@
             match.flagA + ' ' + escapeHtml(match.teamA) + ' vs ' + match.flagB + ' ' + escapeHtml(match.teamB) +
             '</div>' +
             '<div style="font-size:0.78rem;margin-bottom:6px;">Resultat : ' + resultLine + '</div>' +
+            colHeader +
             rows +
             '</div>';
         }).join('');
@@ -488,10 +503,12 @@
             renderBetsDetail();
             detailBox.style.display = 'block';
             detailFilters.style.display = 'flex';
+            detailLegend.style.display = 'block';
             detailToggleBtn.innerHTML = '<i class="fas fa-list"></i> Masquer le detail des paris';
           } else {
             detailBox.style.display = 'none';
             detailFilters.style.display = 'none';
+            detailLegend.style.display = 'none';
             detailToggleBtn.innerHTML = '<i class="fas fa-list"></i> Voir tous les paris en detail';
           }
         });
