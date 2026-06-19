@@ -115,7 +115,7 @@
           — <span style="color:#777;">Match pas encore joué</span>
           <br>Le trait fin entre chaque ligne sépare juste les paris des différents joueurs sur le même match — il n'a pas de sens particulier.
         </div>
-        <div id="admin-bets-detail" style="display:none;margin-top:10px;max-height:480px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;"></div>
+        <div id="admin-bets-detail" style="display:none;margin-top:10px;max-height:75vh;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:14px;"></div>
         <p style="color:#666;font-size:0.75rem;margin-top:8px;">
           💡 En production : exporter les données et commiter dans /data/
         </p>
@@ -450,7 +450,7 @@
           return;
         }
 
-        const colHeader = '<div style="display:grid;grid-template-columns:1fr 1fr 90px;gap:8px;padding:4px 0 6px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.4px;color:#888;border-bottom:1px solid var(--color-border);">' +
+        const colHeader = '<div style="display:grid;grid-template-columns:1.1fr 1.3fr 120px;gap:10px;padding:5px 0 8px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.4px;color:#888;border-bottom:1px solid var(--color-border);">' +
           '<span>Joueur</span><span>Pari</span><span style="text-align:right;">Statut</span></div>';
 
         const blocks = matchesWithBets.map(match => {
@@ -469,13 +469,23 @@
             const name = user
               ? (user.avatar || '') + ' ' + escapeHtml(user.username)
               : '(utilisateur supprime: ' + escapeHtml(bet.userId) + ')';
+
+            let localIsCorrect = null;
+            let localIsExactScore = null;
+            if (match.result != null) {
+              localIsCorrect = bet.prediction === match.result;
+              if (bet.betType === 'exact' && match.resultScoreA != null && match.resultScoreB != null) {
+                localIsExactScore = bet.scoreA === match.resultScoreA && bet.scoreB === match.resultScoreB;
+              }
+            }
+
             let icon = '—';
             let color = '#777';
             let statusLabel = 'En attente';
-            if (bet.isExactScore === true) { icon = '🎯'; color = '#2ecc71'; statusLabel = 'Score exact'; }
-            else if (bet.isCorrect === true) { icon = '✅'; color = '#2ecc71'; statusLabel = 'Bonne issue'; }
-            else if (bet.isCorrect === false) { icon = '❌'; color = '#e74c3c'; statusLabel = 'Faux'; }
-            return '<div style="display:grid;grid-template-columns:1fr 1fr 90px;gap:8px;align-items:center;padding:5px 0;font-size:0.82rem;border-top:1px solid rgba(255,255,255,0.05);">' +
+            if (localIsExactScore === true) { icon = '🎯'; color = '#2ecc71'; statusLabel = 'Score exact'; }
+            else if (localIsCorrect === true) { icon = '✅'; color = '#2ecc71'; statusLabel = 'Bonne issue'; }
+            else if (localIsCorrect === false) { icon = '❌'; color = '#e74c3c'; statusLabel = 'Faux'; }
+            return '<div style="display:grid;grid-template-columns:1.1fr 1.3fr 120px;gap:10px;align-items:center;padding:7px 0;font-size:0.88rem;border-top:1px solid rgba(255,255,255,0.05);">' +
               '<span>' + name + '</span>' +
               '<span style="color:#ccc;">' + betLabel(bet, match) + '</span>' +
               '<span style="color:' + color + ';text-align:right;white-space:nowrap;">' + icon + ' ' + statusLabel + '</span>' +
