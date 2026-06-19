@@ -608,14 +608,14 @@ function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
     prediction,
     betType: isExact ? 'exact' : 'simple',
     placedAt: new Date().toISOString(),
-    isCorrect: match.result !== null ? prediction === match.result : null,
+    isCorrect: match.result != null ? prediction === match.result : null,
     isExactScore: null,
   };
 
   if (isExact) {
     bet.scoreA = scoreA;
     bet.scoreB = scoreB;
-    if (match.result !== null && match.resultScoreA != null && match.resultScoreB != null) {
+    if (match.result != null && match.resultScoreA != null && match.resultScoreB != null) {
       bet.isExactScore = scoreA === match.resultScoreA && scoreB === match.resultScoreB;
     }
   }
@@ -678,7 +678,7 @@ function saveMatches(matches) {
  * @returns {boolean} True if betting is locked
  */
 function isBetLocked(match) {
-  if (match.result !== null) return true;
+  if (match.result != null) return true;
   const kickoff = new Date(match.date).getTime();
   return Date.now() >= kickoff - BET_DEADLINE_MS;
 }
@@ -793,8 +793,10 @@ function recalculateMatch(matchId) {
   // Sync affected bets to Firestore
   fbSaveBets(bets.filter(b => b.matchId === matchId));
 
-  // Recalculate all user points from scratch
-  recalculateAllPoints();
+  // Full repair pass: recompute isCorrect/isExactScore for EVERY match's bets,
+  // not just this one, so points never drift between single-match entry and
+  // the full "Recalculer tous les points" button.
+  recalculateAllMatches();
 
   return correctCount;
 }
