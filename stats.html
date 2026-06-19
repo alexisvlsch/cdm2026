@@ -98,6 +98,15 @@
         <button class="btn" id="admin-detail-toggle-btn" style="margin-top:10px;width:100%;background:#1a1a2e;color:#f1c40f;border:1px solid #f1c40f;border-radius:var(--radius-sm);padding:10px 16px;font-size:0.9rem;cursor:pointer;">
           <i class="fas fa-list"></i> Voir tous les paris en détail
         </button>
+        <div id="admin-detail-filters" style="display:none;margin-top:10px;gap:10px;flex-wrap:wrap;align-items:center;">
+          <select id="admin-detail-user-select" style="background:#1a1a2e;color:#fff;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:6px 10px;font-size:0.85rem;">
+            <option value="">Tous les joueurs</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#ccc;cursor:pointer;">
+            <input type="checkbox" id="admin-detail-played-only" />
+            Matchs joués uniquement
+          </label>
+        </div>
         <div id="admin-bets-detail" style="display:none;margin-top:14px;max-height:480px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;"></div>
         <p style="color:#666;font-size:0.75rem;margin-top:8px;">
           💡 En production : exporter les données et commiter dans /data/
@@ -317,6 +326,9 @@
       const recalcAllBtn = document.getElementById('admin-recalc-all-btn');
       const detailToggleBtn = document.getElementById('admin-detail-toggle-btn');
       const detailBox = document.getElementById('admin-bets-detail');
+      const detailFilters = document.getElementById('admin-detail-filters');
+      const detailUserSelect = document.getElementById('admin-detail-user-select');
+      const detailPlayedOnly = document.getElementById('admin-detail-played-only');
       const resultMsg = document.getElementById('admin-result-msg');
       const scoreAInput = document.getElementById('admin-score-a');
       const scoreBInput = document.getElementById('admin-score-b');
@@ -385,6 +397,13 @@
         });
       }
 
+      // Copie locale: getResultLabel n'existait que dans bets.html, pas partagee via app.js
+      function adminResultLabel(match) {
+        if (match.result === 'teamA') return escapeHtml(match.teamA) + ' gagne';
+        if (match.result === 'teamB') return escapeHtml(match.teamB) + ' gagne';
+        return 'Match nul';
+      }
+
       function betLabel(bet, match) {
         if (bet.betType === 'exact') {
           return escapeHtml(match.teamA) + ' ' + bet.scoreA + ' – ' + bet.scoreB + ' ' + escapeHtml(match.teamB);
@@ -394,26 +413,42 @@
         return 'Match nul';
       }
 
+      function populateDetailUserFilter() {
+        const users = getUsers().slice().sort((a, b) => a.username.localeCompare(b.username));
+        const current = detailUserSelect.value;
+        detailUserSelect.innerHTML = '<option value="">Tous les joueurs</option>' +
+          users.map(u => '<option value="' + escapeHtml(u.id) + '">' + (u.avatar || '') + ' ' + escapeHtml(u.username) + '</option>').join('');
+        detailUserSelect.value = current;
+      }
+
       function renderBetsDetail() {
         const matches = getMatches();
         const bets = getBets();
         const users = getUsers();
         const userMap = new Map(users.map(u => [u.id, u]));
 
-        const matchesWithBets = matches
-          .filter(m => bets.some(b => b.matchId === m.id))
-          .sort((a, b) => new Date(b.date) - new Date(a.date));
+        const userFilter = detailUserSelect.value;
+        const playedOnly = detailPlayedOnly.checked;
+
+        let matchesWithBets = matches.filter(m => bets.some(b => b.matchId === m.id));
+        if (playedOnly) {
+          matchesWithBets = matchesWithBets.filter(m => m.result != null);
+        }
+        matchesWithBets = matchesWithBets.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         if (matchesWithBets.length === 0) {
-          detailBox.innerHTML = '<p style="color:#777;font-size:0.85rem;">Aucun pari place pour le moment.</p>';
+          detailBox.innerHTML = '<p style="color:#777;font-size:0.85rem;">Aucun pari a afficher avec ces filtres.</p>';
           return;
         }
 
-        detailBox.innerHTML = matchesWithBets.map(match => {
-          const matchBets = bets.filter(b => b.matchId === match.id);
+        const blocks = matchesWithBets.map(match => {
+          let matchBets = bets.filter(b => b.matchId === match.id);
+          if (userFilter) matchBets = matchBets.filter(b => b.userId === userFilter);
+          if (matchBets.length === 0) return '';
+
           const resultLine = match.result == null
             ? '<span style="color:#777;">Pas encore joue</span>'
-            : '<span style="color:#2ecc71;">' + getResultLabel(match) +
+            : '<span style="color:#2ecc71;">' + adminResultLabel(match) +
               (match.resultScoreA != null ? ' (' + match.resultScoreA + '-' + match.resultScoreB + ')' : '') +
               '</span>';
 
@@ -441,20 +476,32 @@
             rows +
             '</div>';
         }).join('');
+
+        detailBox.innerHTML = blocks || '<p style="color:#777;font-size:0.85rem;">Aucun pari a afficher avec ces filtres.</p>';
       }
 
       if (detailToggleBtn) {
         detailToggleBtn.addEventListener('click', () => {
           const isHidden = detailBox.style.display === 'none';
           if (isHidden) {
+            populateDetailUserFilter();
             renderBetsDetail();
             detailBox.style.display = 'block';
+            detailFilters.style.display = 'flex';
             detailToggleBtn.innerHTML = '<i class="fas fa-list"></i> Masquer le detail des paris';
           } else {
             detailBox.style.display = 'none';
+            detailFilters.style.display = 'none';
             detailToggleBtn.innerHTML = '<i class="fas fa-list"></i> Voir tous les paris en detail';
           }
         });
+      }
+
+      if (detailUserSelect) {
+        detailUserSelect.addEventListener('change', renderBetsDetail);
+      }
+      if (detailPlayedOnly) {
+        detailPlayedOnly.addEventListener('change', renderBetsDetail);
       }
 
       syncAdminToggleState();
