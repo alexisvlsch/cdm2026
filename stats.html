@@ -43,8 +43,6 @@
               <th>🏅 Rang</th>
               <th>👤 Joueur</th>
               <th title="Nombre de pronostics corrects">✅ Réussis</th>
-              <th title="Nombre total de paris placés">🎲 Paris placés</th>
-              <th title="Taux de réussite sur les matchs joués">🎯 Réussite</th>
               <th title="Points accumulés">⭐ Points</th>
             </tr>
           </thead>
@@ -303,13 +301,6 @@
               </div>
             </td>
             <td>${entry.correctBets}</td>
-            <td>${entry.totalBets}</td>
-            <td>
-              <div class="success-rate-bar">
-                <div class="rate-bar"><div class="rate-fill" style="width:${entry.successRate}%"></div></div>
-                <span style="font-size:0.8rem;color:var(--color-text-muted);min-width:36px;">${entry.successRate}%</span>
-              </div>
-            </td>
             <td><strong style="font-family:var(--font-mono);color:var(--color-bg-dark);">${entry.points}</strong></td>
           </tr>
         `;

@@ -151,7 +151,10 @@ const KEYS = {
   BETS: 'wc2026_bets',
   CURRENT_USER: 'wc2026_currentUser',
   MATCHES: 'wc2026_matches',
+  LAST_FETCH: 'wc2026_lastFetch',
 };
+
+const FETCH_TTL_MS = 60 * 1000;
 
 const BET_DEADLINE_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 const PROFILE_AVATARS = [
@@ -256,8 +259,14 @@ async function loadAllData() {
 
   let users, bets;
 
-  if (db) {
-    // Load users, bets, and match results from Firestore for shared persistence
+  const lastFetch = storageGet(KEYS.LAST_FETCH, 0);
+  const cacheIsFresh = (Date.now() - lastFetch) < FETCH_TTL_MS;
+
+  if (db && cacheIsFresh) {
+    users = storageGet(KEYS.USERS, []);
+    bets = storageGet(KEYS.BETS, []);
+    debugLog('Using cached data (TTL not expired)', { users: users.length, bets: bets.length });
+  } else if (db) {
     try {
       const [usersSnap, betsSnap, matchResultsSnap] = await Promise.all([
         db.collection('users').get(),
@@ -306,6 +315,7 @@ async function loadAllData() {
       storageSet(KEYS.USERS, users);
       storageSet(KEYS.BETS, bets);
       storageSet(KEYS.MATCHES, matches);
+      storageSet(KEYS.LAST_FETCH, Date.now());
       debugLog('Firestore data loaded', { users: users.length, bets: bets.length });
     } catch (e) {
       console.warn('[WC2026] Firestore load failed, falling back to localStorage:', e);
