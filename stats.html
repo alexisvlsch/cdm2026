@@ -81,6 +81,15 @@
           </div>
           <div class="admin-derived-result" id="admin-derived-result">Résultat dérivé : <strong>--</strong></div>
         </div>
+        <div id="admin-et-section" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--color-border);">
+          <label style="color:#aaa;font-size:0.85rem;display:block;margin-bottom:8px;">
+            🎁 Match nul : qui gagne aux prolongations / tirs au but ?
+          </label>
+          <div style="display:flex;gap:8px;">
+            <button type="button" id="admin-et-a">Équipe A</button>
+            <button type="button" id="admin-et-b">Équipe B</button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-danger" id="admin-submit-btn" style="flex:1;">
             <i class="fas fa-check"></i> Valider le résultat
@@ -112,7 +121,8 @@
           🎯 <span style="color:#2ecc71;">Score exact</span> (+5 pts) ·
           ✅ <span style="color:#2ecc71;">Bonne issue</span> (+1/+2 pts) ·
           ❌ <span style="color:#e74c3c;">Pari faux</span> ·
-          — <span style="color:#777;">Match pas encore joué</span>
+          — <span style="color:#777;">Match pas encore joué</span> ·
+          🎁 <span style="color:#2ecc71;">Bonus prolongations</span> (+1 pt, matchs à élimination directe finissant à égalité)
           <br>Le trait fin entre chaque ligne sépare juste les paris des différents joueurs sur le même match — il n'a pas de sens particulier.
         </div>
         <div id="admin-bets-detail" style="display:none;margin-top:10px;max-height:75vh;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:14px;"></div>
@@ -336,6 +346,22 @@
       const derivedResultEl = document.getElementById('admin-derived-result');
       const teamALabel = document.getElementById('admin-team-a-label');
       const teamBLabel = document.getElementById('admin-team-b-label');
+      const etSection = document.getElementById('admin-et-section');
+      const etBtnA = document.getElementById('admin-et-a');
+      const etBtnB = document.getElementById('admin-et-b');
+
+      let currentMatch = null;
+      let selectedEtWinner = null;
+
+      const ET_BTN_STYLE_OFF = 'flex:1;background:#1a1a2e;color:#fff;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:8px;font-size:0.85rem;cursor:pointer;';
+      const ET_BTN_STYLE_ON = 'flex:1;background:var(--color-gold);color:var(--color-text-dark);border:1px solid var(--color-gold);border-radius:var(--radius-sm);padding:8px;font-size:0.85rem;cursor:pointer;font-weight:700;';
+
+      function syncEtButtons() {
+        etBtnA.textContent = teamALabel.textContent;
+        etBtnB.textContent = teamBLabel.textContent;
+        etBtnA.style.cssText = selectedEtWinner === 'teamA' ? ET_BTN_STYLE_ON : ET_BTN_STYLE_OFF;
+        etBtnB.style.cssText = selectedEtWinner === 'teamB' ? ET_BTN_STYLE_ON : ET_BTN_STYLE_OFF;
+      }
 
       function syncAdminToggleState() {
         const isVisible = panel.classList.contains('visible');
@@ -406,12 +432,21 @@
       }
 
       function betLabel(bet, match) {
+        let label;
         if (bet.betType === 'exact') {
-          return escapeHtml(match.teamA) + ' ' + bet.scoreA + ' – ' + bet.scoreB + ' ' + escapeHtml(match.teamB);
+          label = escapeHtml(match.teamA) + ' ' + bet.scoreA + ' – ' + bet.scoreB + ' ' + escapeHtml(match.teamB);
+        } else if (bet.prediction === 'teamA') {
+          label = escapeHtml(match.teamA) + ' gagne';
+        } else if (bet.prediction === 'teamB') {
+          label = escapeHtml(match.teamB) + ' gagne';
+        } else {
+          label = 'Match nul';
         }
-        if (bet.prediction === 'teamA') return escapeHtml(match.teamA) + ' gagne';
-        if (bet.prediction === 'teamB') return escapeHtml(match.teamB) + ' gagne';
-        return 'Match nul';
+        if (bet.prediction === 'draw' && bet.etPrediction != null) {
+          const etName = bet.etPrediction === 'teamA' ? match.teamA : match.teamB;
+          label += ' (prolong. : ' + escapeHtml(etName) + ')';
+        }
+        return label;
       }
 
       function populateDetailUserFilter() {
@@ -454,6 +489,9 @@
             ? '<span style="color:#777;">Pas encore joue</span>'
             : '<span style="color:#2ecc71;">' + adminResultLabel(match) +
               (match.resultScoreA != null ? ' (' + match.resultScoreA + '-' + match.resultScoreB + ')' : '') +
+              (match.result === 'draw' && match.etWinner != null
+                ? ' · Prolongations : ' + escapeHtml(match.etWinner === 'teamA' ? match.teamA : match.teamB)
+                : '') +
               '</span>';
 
           const rows = matchBets.map(bet => {
@@ -464,10 +502,14 @@
 
             let localIsCorrect = null;
             let localIsExactScore = null;
+            let localEtCorrect = null;
             if (match.result != null) {
               localIsCorrect = bet.prediction === match.result;
               if (bet.betType === 'exact' && match.resultScoreA != null && match.resultScoreB != null) {
                 localIsExactScore = bet.scoreA === match.resultScoreA && bet.scoreB === match.resultScoreB;
+              }
+              if (match.result === 'draw' && match.etWinner != null && bet.etPrediction != null) {
+                localEtCorrect = bet.etPrediction === match.etWinner;
               }
             }
 
@@ -481,6 +523,11 @@
               statusLabel = bet.betType === 'exact' ? 'Bonne issue (+1)' : 'Bonne issue (+2)';
             } else if (localIsCorrect === false) {
               icon = '❌'; color = '#e74c3c'; statusLabel = 'Faux (+0)';
+            }
+            if (localEtCorrect === true) {
+              statusLabel += ' + bonus 🎁 (+1)';
+            } else if (localEtCorrect === false) {
+              statusLabel += ' · bonus raté';
             }
             return '<div style="display:grid;grid-template-columns:1.3fr 1.6fr 140px;gap:14px;align-items:center;padding:7px 0;font-size:0.88rem;border-top:1px solid rgba(255,255,255,0.05);">' +
               '<span>' + name + '</span>' +
@@ -544,12 +591,14 @@
         const rawB = scoreBInput.value.trim();
         if (rawA === '' || rawB === '') {
           derivedResultEl.innerHTML = 'Résultat dérivé : <strong>--</strong>';
+          etSection.style.display = 'none';
           return;
         }
         const a = parseInt(rawA, 10);
         const b = parseInt(rawB, 10);
         if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
           derivedResultEl.innerHTML = 'Résultat dérivé : <strong style="color:var(--color-error);">⚠️ Invalide</strong>';
+          etSection.style.display = 'none';
           return;
         }
         let label;
@@ -557,24 +606,42 @@
         else if (b > a) label = `🏆 ${teamBLabel.textContent} gagne`;
         else label = '🤝 Match nul';
         derivedResultEl.innerHTML = `Résultat dérivé : <strong>${label}</strong>`;
+
+        // Le vainqueur des prolongations ne concerne que les matchs nuls a elimination directe
+        const showEtPicker = (a === b) && currentMatch && isKnockoutStage(currentMatch);
+        etSection.style.display = showEtPicker ? 'block' : 'none';
+        if (!showEtPicker) selectedEtWinner = null;
+        syncEtButtons();
       }
 
       // Update team name labels and prefill scores when a match is selected
       matchSelect.addEventListener('change', () => {
         const matchId = matchSelect.value;
         const match = matches.find(m => m.id === matchId);
+        currentMatch = match || null;
         if (match) {
           teamALabel.textContent = `${match.flagA} ${match.teamA}`;
           teamBLabel.textContent = `${match.flagB} ${match.teamB}`;
           scoreAInput.value = match.resultScoreA ?? 0;
           scoreBInput.value = match.resultScoreB ?? 0;
+          selectedEtWinner = match.etWinner ?? null;
         } else {
           teamALabel.textContent = 'Équipe A';
           teamBLabel.textContent = 'Équipe B';
           scoreAInput.value = 0;
           scoreBInput.value = 0;
+          selectedEtWinner = null;
         }
         updateDerivedResult();
+      });
+
+      etBtnA.addEventListener('click', () => {
+        selectedEtWinner = selectedEtWinner === 'teamA' ? null : 'teamA';
+        syncEtButtons();
+      });
+      etBtnB.addEventListener('click', () => {
+        selectedEtWinner = selectedEtWinner === 'teamB' ? null : 'teamB';
+        syncEtButtons();
       });
 
       scoreAInput.addEventListener('input', updateDerivedResult);
@@ -629,7 +696,8 @@
         else result = 'draw';
 
         const option = matchSelect.querySelector(`option[value="${matchId}"]`);
-        const correctCount = setMatchResult(matchId, result, resultScoreA, resultScoreB);
+        const etWinnerToSave = result === 'draw' ? selectedEtWinner : null;
+        const correctCount = setMatchResult(matchId, result, resultScoreA, resultScoreB, etWinnerToSave);
 
         if (option && !option.textContent.includes('✓')) {
           option.textContent += ' ✓';
@@ -663,6 +731,7 @@
 
         scoreAInput.value = 0;
         scoreBInput.value = 0;
+        selectedEtWinner = null;
         updateDerivedResult();
 
         resultMsg.style.color = '#2ecc71';

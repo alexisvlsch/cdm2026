@@ -675,6 +675,63 @@ input {
 .result-badge.correct { background: var(--color-success); color: white; }
 .result-badge.wrong { background: var(--color-error); color: white; }
 
+/* === PROLONGATIONS BONUS (knockout-stage draw bonus) === */
+.bet-bonus-picker {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-gold);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 215, 0, 0.07);
+}
+
+.bet-bonus-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.bet-bonus-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bet-bonus-btn {
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.bet-bonus-btn:hover {
+  border-color: var(--color-gold);
+  background: rgba(255, 215, 0, 0.15);
+}
+
+.bet-bonus-btn.selected {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: var(--color-text-dark);
+}
+
+.bet-bonus-status {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.bet-bonus-status.bonus-correct { color: var(--color-success); }
+.bet-bonus-status.bonus-wrong { color: var(--color-error); }
+
 /* === BET TYPE TABS === */
 .bet-type-tabs {
   display: flex;

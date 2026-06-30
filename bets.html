@@ -230,6 +230,11 @@
         btn.addEventListener('click', () => handleExactScoreSubmit(btn));
       });
 
+      // Attach prolongations bonus picker listeners
+      grid.querySelectorAll('.bet-bonus-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleEtPredictionClick(btn));
+      });
+
       // Attach score stepper button listeners
       grid.querySelectorAll('.score-stepper-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -315,6 +320,43 @@
 
       if (locked) buttonsDisabled = 'disabled';
 
+      // === Bonus prolongations (matchs a elimination directe uniquement) ===
+      // Si le pari (simple ou score exact) predit un match nul, on propose de
+      // deviner le vainqueur des prolongations / tirs au but pour +1 pt bonus.
+      let etBonusHtml = '';
+      if (isKnockoutStage(match) && userBet) {
+        const predictsDraw = (userBet.betType === 'exact')
+          ? userBet.scoreA === userBet.scoreB
+          : userBet.prediction === 'draw';
+
+        if (predictsDraw) {
+          if (match.result === 'draw') {
+            if (match.etWinner == null) {
+              etBonusHtml = `<div class="bet-bonus-status">⏳ Vainqueur des prolongations pas encore renseigné.</div>`;
+            } else if (userBet.etPrediction == null) {
+              etBonusHtml = `<div class="bet-bonus-status">🎁 Bonus non joué (tu n'avais pas choisi de vainqueur).</div>`;
+            } else if (userBet.etPrediction === match.etWinner) {
+              etBonusHtml = `<div class="bet-bonus-status bonus-correct">🎁 Bonus prolongations réussi ! <span class="result-badge correct">+1 pt 🌟</span></div>`;
+            } else {
+              const etWinnerName = userBet.etPrediction === match.etWinner ? '' : (match.etWinner === 'teamA' ? match.teamA : match.teamB);
+              etBonusHtml = `<div class="bet-bonus-status bonus-wrong">🎁 Bonus raté. Vainqueur prolongations : <strong>${escapeHtml(etWinnerName)}</strong></div>`;
+            }
+          } else if (!locked) {
+            const etA = userBet.etPrediction === 'teamA' ? ' selected' : '';
+            const etB = userBet.etPrediction === 'teamB' ? ' selected' : '';
+            etBonusHtml = `
+              <div class="bet-bonus-picker">
+                <div class="bet-bonus-label">🎁 Bonus +1 pt si égalité : qui gagne aux prolongations / tirs au but ?</div>
+                <div class="bet-bonus-buttons">
+                  <button type="button" class="bet-bonus-btn${etA}" data-match-id="${escapeHtml(match.id)}" data-et-prediction="teamA">${match.flagA} ${escapeHtml(match.teamA)}</button>
+                  <button type="button" class="bet-bonus-btn${etB}" data-match-id="${escapeHtml(match.id)}" data-et-prediction="teamB">${match.flagB} ${escapeHtml(match.teamB)}</button>
+                </div>
+              </div>
+            `;
+          }
+        }
+      }
+
       if (hasResult && userBet) {
         if (userBet.betType === 'exact') {
           const localIsCorrect = userBet.prediction === match.result;
@@ -378,6 +420,7 @@
                 ${teamBLabel}
               </button>
             </div>
+            ${etBonusHtml}
             ${statusHtml}
           </div>
         `;
@@ -437,6 +480,7 @@
               Valider le score exact
             </button>
           </div>
+          ${etBonusHtml}
           ${statusHtml}
         </div>
       `;
@@ -511,7 +555,9 @@
         return;
       }
 
-      const result = placeBet(currentUser.id, matchId, null, scoreA, scoreB);
+      const existingBet = getUserBet(currentUser.id, matchId);
+      const carryEtPrediction = existingBet ? existingBet.etPrediction : null;
+      const result = placeBet(currentUser.id, matchId, null, scoreA, scoreB, carryEtPrediction);
       if (!result.success) {
         showToast(result.error, 'error');
         return;
@@ -519,6 +565,38 @@
 
       allBets = getBets();
       showToast('Score exact enregistré ! ⚽', 'success');
+      renderMatches();
+    }
+
+    /**
+     * Handle a click on the prolongations bonus picker (only shown when the
+     * current bet predicts a draw on a knockout-stage match).
+     * @param {HTMLElement} btn - The clicked bonus button
+     */
+    function handleEtPredictionClick(btn) {
+      const matchId = btn.dataset.matchId;
+      const etPrediction = btn.dataset.etPrediction;
+
+      const existingBet = getUserBet(currentUser.id, matchId);
+      if (!existingBet) return;
+
+      // Click the already-selected option again to clear the bonus pick
+      const newEtPrediction = existingBet.etPrediction === etPrediction ? null : etPrediction;
+
+      let result;
+      if (existingBet.betType === 'exact') {
+        result = placeBet(currentUser.id, matchId, null, existingBet.scoreA, existingBet.scoreB, newEtPrediction);
+      } else {
+        result = placeBet(currentUser.id, matchId, existingBet.prediction, null, null, newEtPrediction);
+      }
+
+      if (!result.success) {
+        showToast(result.error, 'error');
+        return;
+      }
+
+      allBets = getBets();
+      showToast(newEtPrediction ? 'Bonus prolongations enregistré ! 🎁' : 'Bonus annulé', newEtPrediction ? 'success' : 'info');
       renderMatches();
     }
 

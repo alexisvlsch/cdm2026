@@ -87,6 +87,7 @@ function fbSaveMatchResult(match) {
   const payload = { id: match.id, result: match.result };
   if (match.resultScoreA != null) payload.resultScoreA = match.resultScoreA;
   if (match.resultScoreB != null) payload.resultScoreB = match.resultScoreB;
+  if (match.etWinner != null) payload.etWinner = match.etWinner;
   db.collection('matches').doc(match.id).set(payload)
     .catch(e => debugLog('Firestore: save match result failed', e));
 }
@@ -308,6 +309,7 @@ async function loadAllData() {
           m.result = data.result;
           if (data.resultScoreA != null) m.resultScoreA = data.resultScoreA;
           if (data.resultScoreB != null) m.resultScoreB = data.resultScoreB;
+          if (data.etWinner != null) m.etWinner = data.etWinner;
         }
       }
 
@@ -356,6 +358,7 @@ async function fetchAndMergeFixtures(url) {
           result: m.result,
           resultScoreA: m.resultScoreA,
           resultScoreB: m.resultScoreB,
+          etWinner: m.etWinner,
         }]))
       : new Map();
 
@@ -366,6 +369,7 @@ async function fetchAndMergeFixtures(url) {
       const out = { ...m, result: saved.result ?? null };
       if (saved.resultScoreA != null) out.resultScoreA = saved.resultScoreA;
       if (saved.resultScoreB != null) out.resultScoreB = saved.resultScoreB;
+      if (saved.etWinner != null) out.etWinner = saved.etWinner;
       return out;
     });
 
@@ -589,7 +593,7 @@ function getUserBet(userId, matchId) {
  * @param {number|null} [scoreB] - Exact score for team B (exact bet only)
  * @returns {{success: boolean, error?: string}}
  */
-function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
+function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null, etPrediction = null) {
   const matches = getMatches();
   const match = matches.find(m => m.id === matchId);
   if (!match) return { success: false, error: 'Match introuvable.' };
@@ -611,6 +615,11 @@ function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
   const bets = getBets();
   const existing = bets.findIndex(b => b.userId === userId && b.matchId === matchId);
 
+  // The "prolongations" bonus prediction only makes sense when the base call is a
+  // draw on a knockout-stage match (those always resolve to a winner eventually).
+  const validEtPrediction = (prediction === 'draw' && isKnockoutStage(match) &&
+    (etPrediction === 'teamA' || etPrediction === 'teamB')) ? etPrediction : null;
+
   const bet = {
     id: existing >= 0 ? bets[existing].id : generateUUID(),
     userId,
@@ -620,6 +629,8 @@ function placeBet(userId, matchId, prediction, scoreA = null, scoreB = null) {
     placedAt: new Date().toISOString(),
     isCorrect: match.result != null ? prediction === match.result : null,
     isExactScore: null,
+    etPrediction: validEtPrediction,
+    etCorrect: null,
   };
 
   if (isExact) {
@@ -694,6 +705,18 @@ function isBetLocked(match) {
 }
 
 /**
+ * Check whether a match belongs to the knockout stage (not the group stage).
+ * Knockout matches always need an outright winner: if level after 90 minutes,
+ * extra time / penalties decide it. This is what the "prolongations" bonus
+ * prediction relates to (see placeBet's etPrediction param).
+ * @param {Object} match - Match object
+ * @returns {boolean} True if the match is part of the knockout bracket
+ */
+function isKnockoutStage(match) {
+  return match.stage !== 'Phase de groupes';
+}
+
+/**
  * Format a date as a French locale string.
  * @param {string} isoDate - ISO date string
  * @returns {string} Formatted date string in French
@@ -721,7 +744,7 @@ function formatDate(isoDate) {
  * @param {number|null} [resultScoreB] - Actual score for team B (optional)
  * @returns {number} Count of correct bets
  */
-function setMatchResult(matchId, result, resultScoreA = null, resultScoreB = null) {
+function setMatchResult(matchId, result, resultScoreA = null, resultScoreB = null, etWinner = null) {
   const matches = getMatches();
   const match = matches.find(m => m.id === matchId);
   if (!match) return 0;
@@ -732,6 +755,12 @@ function setMatchResult(matchId, result, resultScoreA = null, resultScoreB = nul
   } else {
     delete match.resultScoreA;
     delete match.resultScoreB;
+  }
+  // Prolongations winner only applies to a draw on a knockout-stage match
+  if (result === 'draw' && isKnockoutStage(match) && (etWinner === 'teamA' || etWinner === 'teamB')) {
+    match.etWinner = etWinner;
+  } else {
+    delete match.etWinner;
   }
   saveMatches(matches);
   fbSaveMatchResult(match);
@@ -749,6 +778,7 @@ function resetMatchResult(matchId) {
   if (!match) return;
 
   match.result = null;
+  delete match.etWinner;
   saveMatches(matches);
 
   // Remove the result document from Firestore so other devices see the reset
@@ -757,12 +787,13 @@ function resetMatchResult(matchId) {
       .catch(e => debugLog(`Firestore: delete match result failed for match ${matchId}`, e));
   }
 
-  // Reset isCorrect and isExactScore for all bets on this match
+  // Reset isCorrect, isExactScore and etCorrect for all bets on this match
   const bets = getBets();
   for (const bet of bets) {
     if (bet.matchId === matchId) {
       bet.isCorrect = null;
       bet.isExactScore = null;
+      bet.etCorrect = null;
     }
   }
   saveBets(bets);
@@ -827,6 +858,9 @@ function recalculateAllMatches() {
   for (const match of matches) {
     if (match.result == null) continue;
     const hasScore = match.resultScoreA != null && match.resultScoreB != null;
+    // Prolongations bonus only ever applies to a draw on a knockout-stage match
+    // for which the admin has entered who won after extra time / penalties.
+    const isDrawKnockout = match.result === 'draw' && isKnockoutStage(match) && match.etWinner != null;
     for (const bet of bets) {
       if (bet.matchId !== match.id) continue;
       bet.isCorrect = bet.prediction === match.result;
@@ -835,6 +869,9 @@ function recalculateAllMatches() {
       } else {
         bet.isExactScore = null;
       }
+      bet.etCorrect = (isDrawKnockout && bet.etPrediction != null)
+        ? bet.etPrediction === match.etWinner
+        : null;
     }
   }
 
@@ -850,15 +887,20 @@ function recalculateAllPoints() {
   const pointsMap = new Map(users.map(u => [u.id, 0]));
   for (const bet of bets) {
     if (!pointsMap.has(bet.userId)) continue;
+    let pts = 0;
     if (bet.betType === 'exact') {
       if (bet.isExactScore === true) {
-        pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 5);
+        pts = 5;
       } else if (bet.isCorrect === true) {
-        pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 1);
+        pts = 1;
       }
     } else if (bet.isCorrect === true) {
-      pointsMap.set(bet.userId, pointsMap.get(bet.userId) + 2);
+      pts = 2;
     }
+    // Prolongations bonus: +1 pt on top of the base draw points (2+1=3 simple,
+    // 5+1=6 exact score) when the user also called the right ET/penalties winner.
+    if (bet.etCorrect === true) pts += 1;
+    pointsMap.set(bet.userId, pointsMap.get(bet.userId) + pts);
   }
 
   for (const user of users) {
